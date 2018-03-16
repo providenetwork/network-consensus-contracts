@@ -1,0 +1,18 @@
+{
+  "name": "network-consensus-contracts",
+  "version": "0.0.0",
+  "description": "Suite of smart contracts for proof-of-authority consensus",
+  "repository": "git@github.com:providenetwork/network-consensus-contracts.git",
+  "scripts": {},
+  "author": "Kyle Thomas",
+  "license": "MIT",
+  "devDependencies": {
+    "chai": "^4.1.2",
+    "chai-as-promised": "^7.1.1",
+    "chai-bignumber": "^2.0.2",
+    "ganache-cli": "^6.0.3",
+    "mochawesome": "^3.0.0",
+    "truffle": "^4.1.0"
+  },
+  "dependencies": {}
+}
