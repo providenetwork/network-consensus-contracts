@@ -1,7 +1,7 @@
 {
   "name": "network-consensus-contracts",
   "version": "0.0.0",
-  "description": "Suite of smart contracts for proof-of-authority consensus",
+  "description": "Smart contracts for proof-of-authority consensus (Aura)",
   "repository": "git@github.com:providenetwork/network-consensus-contracts.git",
   "scripts": {},
   "author": "Kyle Thomas",
@@ -12,7 +12,10 @@
     "chai-bignumber": "^2.0.2",
     "ganache-cli": "^6.0.3",
     "mochawesome": "^3.0.0",
-    "truffle": "^4.1.0"
+    "solc": "0.4.23",
+    "truffle": "^4.1.8"
   },
-  "dependencies": {}
+  "dependencies": {
+    "truffle-flattener": "^1.2.5"
+  }
 }

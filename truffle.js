@@ -6,6 +6,13 @@ module.exports = {
       host: "localhost",
       port: 7545,
       network_id: "*" // Match any network id
+    },
+    test: {
+      host: "localhost",
+      port: 7545,
+      network_id: "*",
+      gasPrice: 1,
+      gas: 8000000000000000
     }
   },
   mocha: {

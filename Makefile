@@ -1,36 +1,31 @@
-.PHONY: flatten merge solhint test testrpc travis_test
+.PHONY: clean compile flat solhint test
 
-flatten:
-	#pip3 install solidity-flattener --no-cache-dir -U
-	rm -rf flat/ && mkdir flat
-	rm -fr tmp
+clean:
+	rm -rf build/
+	rm -rf flat/
+	rm -rf tmp/
+
+compile: clean
+	node_modules/.bin/truffle compile
+
+flat: clean
+	mkdir flat
 	mkdir tmp
 
 	cp contracts/*.sol tmp/
-	cp contracts/interfaces/* tmp/
-	cp contracts/lib/* tmp/
-	cp contracts/network/* tmp/
-	cp contracts/storage/* tmp/
+	cp contracts/lib/*.sol tmp/
+	cp contracts/lib/aura/functions/*.sol tmp/
+	cp contracts/lib/aura/functions/init/* tmp/
+	cp contracts/lib/bridges/functions/*.sol tmp/
+	cp contracts/lib/bridges/functions/init/* tmp/
+
+	rm tmp/Migrations.sol
 
 	sed -i '' -e "s/\(import \)\(.*\)\/\(.*\).sol/import '.\/\3.sol/g" tmp/*
-	solidity_flattener tmp/KeyManager.sol | sed "1s/.*/pragma solidity ^0.4.20;/" > flat/KeyManager_flat.sol
-	solidity_flattener tmp/NetworkConsensus.sol | sed "1s/.*/pragma solidity ^0.4.20;/" > flat/NetworkConsensus_flat.sol
-
-merge:
-	node_modules/.bin/sol-merger "src/*.sol" build
+	node_modules/.bin/truffle-flattener tmp/* | sed "1s/.*/pragma solidity ^0.4.23;/" > flat/Network.sol
 
 solhint:
 	solhint contracts/*.sol contracts/util/*.sol
 
 test:
 	node_modules/.bin/truffle test --network test
-
-testganache:
-	node_modules/.bin/truffle test --network ganache
-
-testrpc:
-	node_modules/.bin/testrpc -p 8544
-
-travis_test:
-	nohup make testrpc &
-	make test

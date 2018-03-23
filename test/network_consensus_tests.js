@@ -1,216 +1,227 @@
-let NetworkConsensusMock = artifacts.require('./mock/NetworkConsensusMock')
-let NetworkStorageMock = artifacts.require('./mock/NetworkStorageMock')
+let NetworkConsensus = artifacts.require('./mock/NetworkConsensusMock')
+let RegistryExec = artifacts.require('./mock/RegistryExec')
+let RegistryStorage = artifacts.require('./RegistryStorage')
 
+let InitRegistry = artifacts.require('./InitRegistry')
+let AppConsole = artifacts.require('./AppConsole')
+let VersionConsole = artifacts.require('./VersionConsole')
+let ImplementationConsole = artifacts.require('./ImplementationConsole')
+
+let Aura = artifacts.require('./Aura')
+let ValidatorConsole = artifacts.require('./ValidatorConsole')
+let VotingConsole = artifacts.require('./VotingConsole')
 
 contract('NetworkConsensus', function(accounts) {
-    let networkConsensus, networkStorage
-    masterOfCeremony = accounts[0]
+    let consensus
+    let registry
+    let storage
+    let masterOfCeremony
+
+    let initRegistry
+    let appConsole
+    let versionConsole
+    let implConsole
+
+    let initAura
+    let validatorConsole
+    let votingConsole
 
     beforeEach(async () => {
-        networkStorage = await NetworkStorageMock.new()
-        networkConsensus = await NetworkConsensusMock.new(networkStorage.address, masterOfCeremony)
+        initRegistry = await InitRegistry.new().should.be.fulfilled
+        appConsole = await AppConsole.new().should.be.fulfilled
+        versionConsole = await VersionConsole.new().should.be.fulfilled
+        implConsole = await ImplementationConsole.new().should.be.fulfilled
+
+        initAura = await Aura.new().should.be.fulfilled
+        validatorConsole = await ValidatorConsole.new().should.be.fulfilled
+        votingConsole = await VotingConsole.new().should.be.fulfilled
+
+        storage = await RegistryStorage.new().should.be.fulfilled
+        masterOfCeremony = accounts[0]
+        consensus = await NetworkConsensus.new(
+            masterOfCeremony,
+            storage.address,
+            initRegistry.address,
+            appConsole.address,
+            versionConsole.address,
+            implConsole.address,
+            initAura.address,
+            validatorConsole.address,
+            votingConsole.address
+        ).should.be.fulfilled
+
+        let registryAddr = await consensus.getRegistryAddress()
+        registry = await RegistryExec.at(registryAddr)
     })
 
     describe('initialization', async () => {
-        it('should receive a reference to the default system address', async () => {
-            let systemAddress = await networkConsensus.getSystemAddress()
-            systemAddress.should.not.be.eq(null)
-            systemAddress.should.be.deep.eq('0xfffffffffffffffffffffffffffffffffffffffe')
+        it('should have a reference to the given master of ceremony address', async () => {
+            masterOfCeremony.should.be.eq(accounts[0])
         })
 
-        it('should receive a reference to the network storage contract', async () => {
-            let storage = await networkConsensus.getNetworkStorage()
-            storage.should.not.be.eq(null)
-            storage.should.be.deep.eq(networkStorage.address)
-        })
-
-        it('should not appoint any non-pending validators', async () => {
-            let validators = await networkConsensus.getValidators()
-            validators.should.be.deep.eq([])
-        })
-
-        it('should appoint the master of ceremony as the initial pending validator', async () => {
-            let pendingValidators = await networkConsensus.getPendingValidators()
-            pendingValidators.should.be.deep.eq([masterOfCeremony])
-        })
-
-        it('should not be finalized per Aura consensus spec', async () => {
-            let finalized = await networkConsensus.finalized()
-            finalized.should.be.false
-        })
-
-    })
-
-    context('when changes to the validators list is not finalized', async () => {
-        describe('#finalizeChange', async () => {
-            context('when invoked by the system address', async () => {
-                beforeEach(async () => {
-                    await networkConsensus.setSystemAddress(accounts[0])
-                })
-
-                it('should finalize the pending validator state', async () => {
-                    await networkConsensus.finalizeChange().should.be.fulfilled
-                    let finalized = await networkConsensus.finalized()
-                    finalized.should.be.true
-                })
-
-                it('should reject subsequent attempts to finalize the pending validator state', async () => {
-                    await networkConsensus.finalizeChange().should.be.fulfilled
-                    await networkConsensus.finalizeChange().should.be.rejectedWith(exports.EVM_ERR_REVERT)
-                })
-
-                it('should emit a ChangeFinalized event per Aura consensus spec', async () => {
-                    const { logs } = await networkConsensus.finalizeChange().should.be.fulfilled
-                    logs[0].event.should.be.eq('ChangeFinalized')
-                })
-
-                it('should promote the pending validators set to the finalized set of current validators', async () => {
-                    await networkConsensus.finalizeChange().should.be.fulfilled
-                    let validators = await networkConsensus.getValidators()
-                    validators.should.be.deep.eq([masterOfCeremony])
-                })
+        describe('auth-os application registry', async() => {
+            it('should have initialized the auth-os application registry', async() => {
+                registry.should.not.eq(null)
             })
 
-            context('when not invoked by the system address', async () => {
-                it('should reject the attempt to finalize the pending validator state', async () => {
-                    await networkConsensus.finalizeChange().should.be.rejectedWith(exports.EVM_ERR_REVERT)
-                })
+            it('should have set a default application storage contract on the application registry', async() => {
+                let defaultStorage = await registry.default_storage()
+                defaultStorage.should.eq(storage.address)
             })
+
+            it('should have set a default updater on the application registry', async() => {
+                let defaultUpdater = await registry.default_updater()
+                defaultUpdater.should.eq(consensus.address)
+            })
+
+            it('should have set a default provider on the application registry', async() => {
+                let defaultProvider = await registry.default_provider()
+                let expectedProvider = await consensus.getAppProviderHash(consensus.address).should.be.fulfilled
+                defaultProvider.should.eq(expectedProvider)
+            })
+
+            it('should have set a default registry exec id on the application registry', async() => {
+                let defaultExecId = await registry.default_registry_exec_id()
+                defaultExecId.should.not.deep.eq('0x0000000000000000000000000000000000000000000000000000000000000000')
+            })
+
+            it('should have set the initial exec admin on the application registry to the consensus contract', async() => {
+                let execAdmin = await registry.exec_admin()
+                execAdmin.should.eq(consensus.address)
+            })
+        })
+
+        it('should expose the validator console', async() => {
+            let validatorConsoleAddr = await consensus.getValidatorConsoleAddress.call()
+            validatorConsoleAddr.should.not.eq(null)
+        })
+
+        it('should expose the voting console', async() => {
+            let votingConsoleAddr = await consensus.getVotingConsoleAddress.call()
+            votingConsoleAddr.should.not.eq(null)
         })
     })
 
-    describe('#addValidator', async () => {
-        context('when not invoked by the key manager', async () => {
-            it('should reject the attempt to add the validator', async () => {
-                await networkConsensus.addValidator(accounts[1], true, { from: accounts[2] }).should.be.rejectedWith(exports.EVM_ERR_REVERT)
-            })
+    describe('#initRegistry', async () => {
+        beforeEach(async () => {
         })
 
-        context('when invoked by the key manager', async () => {
+        describe('#getAppLatestInfo', async () => {
+            it('should return the latest finalized version of the Aura consensus application', async () => {
+                let registryAddr = await consensus.getRegistryAddress()
+                let registry = await RegistryExec.at(registryAddr)
+                let registryExecId = await registry.default_registry_exec_id()
+
+                providerInfo = await initRegistry.getProviderInfoFromAddress(storage.address, registryExecId, consensus.address).should.be.fulfilled
+                providerInfo.should.not.eq(null)
+                providerInfo[1].length.should.be.eq(1)
+
+                let provider = await consensus.getAppProviderHash(consensus.address).should.be.fulfilled
+
+                appInfo = await initRegistry.getAppLatestInfo(storage.address, registryExecId, provider, 'Aura').should.be.fulfilled
+                appInfo.should.not.eq(null)
+                appInfo[appInfo.length - 1].length.should.be.eq(2)
+            })
+        })
+    })
+
+    describe('getValidator', async () => {
+        context('immediately after the consensus delegate has been configured', async () => {
             beforeEach(async () => {
-                await networkConsensus.setKeyManagerMock(accounts[0])
             })
 
-            context('when the given address is not a current validator', async () => {
-                it('should attempt to add a new validator', async () => {
-                    await networkConsensus.addValidator(accounts[1], true).should.be.fulfilled
-                })
-
-                it('should reject an attempt to add 0x0 as a validator', async () => {
-                    await networkConsensus.addValidator('0x0', true).should.be.rejectedWith(exports.EVM_ERR_REVERT)
-                    await networkConsensus.addValidator('0x0000000000000000000000000000000000000000', true).should.be.rejectedWith(exports.EVM_ERR_REVERT)
-                })
-
-                it('should set validator meta for new validator', async () => {
-                    await networkConsensus.addValidator(accounts[1], true).should.be.fulfilled
-                    let isValidator = await networkConsensus.isValidator(accounts[1])
-                    isValidator.should.be.true
-                })
-
-                it('should increase length of pending validators', async () => {
-                    let pendingValidators0 = await networkConsensus.getPendingValidators()
-                    pendingValidators0.length.should.be.eq(1)
-                    await networkConsensus.addValidator(accounts[1], true).should.be.fulfilled
-                    let pendingValidators1 = await networkConsensus.getPendingValidators()
-                    pendingValidators1.length.should.be.eq(2)
-                })
-
-                it('should set finalized to false', async () => {
-                    await networkConsensus.addValidator(accounts[1], true).should.be.fulfilled
-                    let finalized = await networkConsensus.finalized()
-                    finalized.should.be.false
-                })
-
-                it('should emit an InitiateChange event containing the pending validators list per Aura consensus spec', async () => {
-                    const { logs } = await networkConsensus.addValidator(accounts[accounts.length - 1], true).should.be.fulfilled
-                    logs[0].event.should.be.eq('InitiateChange')
-                    logs[0].args.newSet.should.be.deep.eq([masterOfCeremony, accounts[accounts.length - 1]])
-                })
-            })
-
-            context('when the given address is a current validator', async () => {
-                beforeEach(async () => {
-                    await networkConsensus.setKeyManagerMock(accounts[0])
-                    await networkConsensus.addValidator(accounts[1], true).should.be.fulfilled
-                })
-
-                it('should reject an attempt to add a duplicate validator', async () => {
-                    await networkConsensus.addValidator(accounts[1], true).should.be.rejectedWith(exports.EVM_ERR_REVERT)
-                })
+            it('should return nil when attempting retrieve the master of ceremony validator struct', async () => {
+                let execId = await consensus.getConsensusAppExecId.call()
+                let validator = await initAura.getValidator.call(storage.address, execId, masterOfCeremony)
+                validator.should.be.eq(null)
             })
         })
     })
 
-    describe('#removeValidator', async () => {
-        context('when not invoked by the key manager', async () => {
-            it('reject the attempt to remove the validator', async () => {
-                await networkConsensus.removeValidator(accounts[1], true).should.be.rejectedWith(exports.EVM_ERR_REVERT)
-            })
-        })
-
-        context('when invoked by the key manager', async () => {
+    describe('getValidatorMetadata', async () => {
+        context('immediately after the consensus delegate has been configured', async () => {
             beforeEach(async () => {
-                await networkConsensus.setKeyManagerMock(accounts[0])
-                await networkConsensus.setSystemAddress(accounts[0])
             })
 
-            context('when the validator being removed is not a current validator', async () => {
-                it('should reject an attempt by the key manager to remove an address which is not a current validator', async () => {
-                    await networkConsensus.removeValidator(accounts[1], true).should.be.rejectedWith(exports.EVM_ERR_REVERT)
-                })
-            })
-
-            context('when the validator being removed is a current validator', async () => {
-                beforeEach(async () => {
-                    await networkConsensus.addValidator(accounts[1], true).should.be.fulfilled
-                })
-    
-                it('should attempt to remove the given validator', async () => {
-                    await networkConsensus.removeValidator(accounts[1], true).should.be.fulfilled
-                })
-
-                it('should emit an InitiateChange event per Aura consensus spec', async () => {
-                    let { logs } = await networkConsensus.removeValidator(accounts[1], true).should.be.fulfilled
-                    logs[0].event.should.be.eq('InitiateChange')
-                    logs[0].args.newSet.length.should.be.eq(1)
-                    logs[0].args.newSet.should.be.deep.eq([masterOfCeremony])
-                })
-
-                it('should decrease length of pending validators', async () => {
-                    let pendingValidators0 = await networkConsensus.getPendingValidators()
-                    pendingValidators0.length.should.be.eq(2)
-
-                    let { logs } = await networkConsensus.removeValidator(accounts[1], true).should.be.fulfilled
-                    logs[0].args.newSet.length.should.be.eq(1)
-                    logs[0].args.newSet.should.be.deep.eq([masterOfCeremony])
-
-                    let pendingValidators1 = await networkConsensus.getPendingValidators()
-                    pendingValidators1.length.should.be.eq(1)
-                })
-
-                it('should update validator meta for the removed validator', async () => {
-                    let isValidator0 = await networkConsensus.isValidator(accounts[1])
-                    isValidator0.should.be.true
-                    await networkConsensus.removeValidator(accounts[1], true).should.be.fulfilled
-                    let isValidator1 = await networkConsensus.isValidator(accounts[1])
-                    isValidator1.should.be.false
-                })
-
-                it('should not be finalized per Aura consensus spec', async () => {
-                    let finalized = await networkConsensus.finalized()
-                    finalized.should.be.false
-                })
+            it('should return nil when attempting retrieve the master of ceremony validator struct', async () => {
+                let execId = await consensus.getConsensusAppExecId.call()
+                let validatorMeta = await initAura.getValidatorMetadata.call(storage.address, execId, masterOfCeremony)
+                validatorMeta.should.be.eq(null)
             })
         })
     })
 
-    describe('#isValidator', async () => {
-        it('should return true when the queried network address belongs to a validator', async () => {
-            (await networkConsensus.isValidator(masterOfCeremony)).should.be.true
-        })
+    describe('getValidatorSupportDivisor', async () => {
+        context('immediately after the consensus delegate has been configured', async () => {
+            beforeEach(async () => {
+            })
 
-        it('should return false when the queried network address does not belong to a validator', async () => {
-            (await networkConsensus.isValidator(accounts[accounts.length - 1])).should.be.false
+            it('should initialize the validator support divisor to the default validator support divisor of 2', async () => {
+                let execId = await consensus.getConsensusAppExecId.call()
+                let validatorSupportDivisor = await initAura.getValidatorSupportDivisor.call(storage.address, execId)
+                validatorSupportDivisor.toNumber().should.be.eq(2)
+            })
+        })
+    })
+
+    describe('getValidatorSupportCount', async () => {
+        context('immediately after the consensus delegate has been configured', async () => {
+            beforeEach(async () => {
+            })
+
+            it('should initialize the master of ceremony with support for itself', async () => {
+                let execId = await consensus.getConsensusAppExecId.call()
+                let validatorSupportCount = await initAura.getValidatorSupportCount.call(storage.address, execId, masterOfCeremony)
+                validatorSupportCount.toNumber().should.be.eq(1)
+            })
+        })
+    })
+
+    describe('getValidators', async () => {
+        context('immediately after the consensus delegate has been configured', async () => {
+            beforeEach(async () => {
+            })
+
+            it('should return the master of ceremony as the sole validator', async () => {
+                let validators = await consensus.getValidators()
+                validators.should.be.deep.eq([masterOfCeremony])
+            })
+        })
+    })
+
+    describe('getValidatorCount', async () => {
+        context('immediately after the consensus delegate has been configured', async () => {
+            beforeEach(async () => {
+            })
+
+            it('should return 1', async () => {
+                let validatorCount = await consensus.getValidatorCount.call()
+                validatorCount.toNumber().should.be.eq(1)
+            })
+        })
+    })
+
+    describe('getPendingValidators', async () => {
+        context('immediately after the consensus delegate has been configured', async () => {
+            beforeEach(async () => {
+            })
+
+            it('should return the master of ceremony as the sole validator', async () => {
+                let pendingValidators = await consensus.getPendingValidators()
+                pendingValidators.should.be.deep.eq([masterOfCeremony])
+            })
+        })
+    })
+
+    describe('getPendingValidatorCount', async () => {
+        context('immediately after the consensus delegate has been configured', async () => {
+            beforeEach(async () => {
+            })
+
+            it('should return 1', async () => {
+                let pendingValidatorCount = await consensus.getPendingValidatorCount.call()
+                pendingValidatorCount.toNumber().should.be.eq(1)
+            })
         })
     })
 })
