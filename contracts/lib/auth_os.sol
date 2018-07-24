@@ -47,10 +47,6 @@ contract AbstractStorage {
       = bytes4(keccak256('registerApp(bytes32,address,bytes4[],address[])'));
   bytes4 internal constant REG_APP_VER
       = bytes4(keccak256('registerAppVersion(bytes32,bytes32,address,bytes4[],address[])'));
-  bytes4 internal constant UPDATE_EXEC_SEL
-      = bytes4(keccak256('updateExec(address)'));
-  bytes4 internal constant UPDATE_INST_SEL
-      = bytes4(keccak256('updateInstance(bytes32,bytes32,address)'));
 
   // Creates an instance of a registry application and returns the execution id
   function createRegistry(address _registry_idx, address _implementation) external returns (bytes32) {
@@ -59,8 +55,6 @@ contract AbstractStorage {
     put(new_exec_id, APP_IDX_ADDR, bytes32(_registry_idx));
     put(new_exec_id, keccak256(REG_APP, 'implementation'), bytes32(_implementation));
     put(new_exec_id, keccak256(REG_APP_VER, 'implementation'), bytes32(_implementation));
-    put(new_exec_id, keccak256(UPDATE_INST_SEL, 'implementation'), bytes32(_implementation));
-    put(new_exec_id, keccak256(UPDATE_EXEC_SEL, 'implementation'), bytes32(_implementation));
     emit ApplicationInitialized(new_exec_id, _registry_idx, msg.sender);
     return new_exec_id;
   }
@@ -1129,7 +1123,7 @@ library Contract {
     // Check the expected function type - if it is VAL_DEC, set the new amount to the difference of
     // _val and _amt, to a minimum of 0
     if (expected() == NextFunction.VAL_DEC) {
-      if (_amt > uint(_val))
+      if (uint(_val) > _amt)
         _amt = 0;
       else
         _amt = uint(_val).sub(_amt);
@@ -1479,53 +1473,50 @@ library Provider {
 
   using Contract for *;
 
-  // Returns the index address for this exec id
-  function appIndex() internal pure returns (bytes32)
-    { return keccak256('index'); }
-
-  // Storage seed for a script executor's execution permission mapping
-  function execPermissions(address _exec) internal pure returns (bytes32)
-    { return keccak256(_exec, keccak256('script_exec_permissions')); }
-
-  // Storage seed for a function selector's implementation address
-  function appSelectors(bytes4 _selector) internal pure returns (bytes32)
-    { return keccak256(_selector, 'implementation'); }
-
   // Returns the location of a provider's list of registered applications in storage
-  function registeredApps() internal pure returns (bytes32)
-    { return keccak256(bytes32(Contract.sender()), 'app_list'); }
+  function registeredApps() internal pure returns (bytes32 location) {
+    location = keccak256(bytes32(Contract.sender()), 'app_list');
+  }
 
   // Returns the location of a registered app's name under a provider
-  function appBase(bytes32 _app) internal pure returns (bytes32)
-    { return keccak256(_app, keccak256(bytes32(Contract.sender()), 'app_base')); }
+  function appBase(bytes32 _app) internal pure returns (bytes32 location) {
+    location = keccak256(_app, keccak256(bytes32(Contract.sender()), 'app_base'));
+  }
 
   // Returns the location of an app's list of versions
-  function appVersionList(bytes32 _app) internal pure returns (bytes32)
-    { return keccak256('versions', appBase(_app)); }
+  function appVersionList(bytes32 _app) internal pure returns (bytes32 location) {
+    location = keccak256('versions', appBase(_app));
+  }
 
   // Returns the location of a version's name
-  function versionBase(bytes32 _app, bytes32 _version) internal pure returns (bytes32)
-    { return keccak256(_version, 'version', appBase(_app)); }
+  function versionBase(bytes32 _app, bytes32 _version) internal pure returns (bytes32 location) {
+    location = keccak256(_version, 'version', appBase(_app));
+  }
 
   // Returns the location of a registered app's index address under a provider
-  function versionIndex(bytes32 _app, bytes32 _version) internal pure returns (bytes32)
-    { return keccak256('index', versionBase(_app, _version)); }
+  function versionIndex(bytes32 _app, bytes32 _version) internal pure returns (bytes32 location) {
+    location = keccak256('index', versionBase(_app, _version));
+  }
 
   // Returns the location of an app's function selectors, registered under a provider
-  function versionSelectors(bytes32 _app, bytes32 _version) internal pure returns (bytes32)
-    { return keccak256('selectors', versionBase(_app, _version)); }
+  function versionSelectors(bytes32 _app, bytes32 _version) internal pure returns (bytes32 location) {
+    location = keccak256('selectors', versionBase(_app, _version));
+  }
 
   // Returns the location of an app's implementing addresses, registered under a provider
-  function versionAddresses(bytes32 _app, bytes32 _version) internal pure returns (bytes32)
-    { return keccak256('addresses', versionBase(_app, _version)); }
+  function versionAddresses(bytes32 _app, bytes32 _version) internal pure returns (bytes32 location) {
+    location = keccak256('addresses', versionBase(_app, _version));
+  }
 
   // Returns the location of the version before the current version
-  function previousVersion(bytes32 _app, bytes32 _version) internal pure returns (bytes32)
-    { return keccak256("previous version", versionBase(_app, _version)); }
+  function previousVersion(bytes32 _app, bytes32 _version) internal pure returns (bytes32 location) {
+    location = keccak256("previous version", versionBase(_app, _version));
+  }
 
   // Returns storage location of appversion list at a specific index
-  function appVersionListAt(bytes32 _app, uint _index) internal pure returns (bytes32)
-    { return bytes32((32 * _index) + uint(appVersionList(_app))); }
+  function appVersionListAt(bytes32 _app, uint _index) internal pure returns (bytes32 location) {
+    location = bytes32((32 * _index) + uint(appVersionList(_app)));
+  }
 
   // Registers an application under a given name for the sender
   function registerApp(bytes32 _app, address _index, bytes4[] _selectors, address[] _implementations) external view {
@@ -1631,157 +1622,6 @@ library Provider {
     Contract.commit();
   }
 
-  /*
-  Updates an application to the latest version -
-
-  @param _provider: The provider of the application
-  @param _app_name: The name of the application
-  @param _current_version: The current version of the application
-  @param _registry_id: The exec id of the registry of the application
-  */
-  function updateInstance(bytes32 _app_name, bytes32 _current_version, bytes32 _registry_id) external view {
-    // Begin execution -
-    Contract.authorize(msg.sender);
-
-    // Validate input -
-    require(_app_name != 0 && _current_version != 0 && _registry_id != 0, 'invalid input');
-
-    // Get current version selectors and ensure nonzero length -
-    bytes4[] memory current_selectors = getVersionSelectors(_app_name, _current_version, _registry_id);
-    require(current_selectors.length != 0, 'invalid current version');
-
-    // Get latest version name and ensure it is not the current version, or zero -
-    bytes32 latest_version = getLatestVersion(_app_name, _registry_id);
-    require(latest_version != _current_version, 'current version is already latest');
-    require(latest_version != 0, 'invalid latest version');
-
-    // Get latest version index, selectors, and implementing addresses.
-    // Ensure all returned values are valid -
-    address latest_idx = getVersionIndex(_app_name, latest_version, _registry_id);
-    bytes4[] memory latest_selectors = getVersionSelectors(_app_name, latest_version, _registry_id);
-    address[] memory latest_impl = getVersionImplementations(_app_name, latest_version, _registry_id);
-    require(latest_idx != 0, 'invalid version idx address');
-    require(latest_selectors.length != 0 && latest_selectors.length == latest_impl.length, 'invalid implementation specification');
-
-    // Set up a storage buffer to clear current version implementation -
-    Contract.storing();
-
-    // For each selector, set its implementation to 0
-    for (uint i = 0; i < current_selectors.length; i++)
-      Contract.set(appSelectors(current_selectors[i])).to(address(0));
-
-    // Set this application's index address to equal the latest version's index -
-    Contract.set(appIndex()).to(latest_idx);
-
-    // Loop over implementing addresses, and map each function selector to its corresponding address for the new instance
-    for (i = 0; i < latest_selectors.length; i++) {
-      require(latest_selectors[i] != 0 && latest_impl[i] != 0, 'invalid input - expected nonzero implementation');
-      Contract.set(appSelectors(latest_selectors[i])).to(latest_impl[i]);
-    }
-
-    // Commit the changes to the storage contract
-    Contract.commit();
-  }
-
-  /*
-  Replaces the script exec address with a new address
-
-  @param _new_exec_addr: The address that will be granted permissions
-  */
-  function updateExec(address _new_exec_addr) external view {
-    // Authorize the sender and set up the run-time memory of this application
-    Contract.authorize(msg.sender);
-
-    // Validate input -
-    require(_new_exec_addr != 0, 'invalid replacement');
-
-    // Set up a storage buffer -
-    Contract.storing();
-
-    // Remove current permissions -
-    Contract.set(execPermissions(msg.sender)).to(false);
-
-    // Add updated permissions for the new address -
-    Contract.set(execPermissions(_new_exec_addr)).to(true);
-
-    // Commit the changes to the storage contract
-    Contract.commit();
-  }
-
-  /// Helpers ///
-
-  function registryRead(bytes32 _location, bytes32 _registry_id) internal view returns (bytes32 value) {
-    _location = keccak256(_location, _registry_id);
-    assembly { value := sload(_location) }
-  }
-
-  /// Registry Getters ///
-
-  /*
-  Returns name of the latest version of an application
-
-  @param _app: The name of the application
-  @param _registry_id: The exec id of the registry application
-  @return bytes32: The latest version of the application
-  */
-  function getLatestVersion(bytes32 _app, bytes32 _registry_id) internal view returns (bytes32) {
-    uint length = uint(registryRead(appVersionList(_app), _registry_id));
-    // Return the latest version of this application
-    return registryRead(appVersionListAt(_app, length), _registry_id);
-  }
-
-  /*
-  Returns the index address of an app version
-
-  @param _app: The name of the application
-  @param _version: The name of the version
-  @param _registry_id: The exec id of the registry application
-  @return address: The index address of this version
-  */
-  function getVersionIndex(bytes32 _app, bytes32 _version, bytes32 _registry_id) internal view returns (address) {
-    return address(registryRead(versionIndex(_app, _version), _registry_id));
-  }
-
-  /*
-  Returns the addresses associated with this version's implementation
-
-  @param _app: The name of the application
-  @param _version: The name of the version
-  @param _registry_id: The exec id of the registry application
-  @return impl: An address array containing all of this version's implementing addresses
-  */
-  function getVersionImplementations(bytes32 _app, bytes32 _version, bytes32 _registry_id) internal view returns (address[] memory impl) {
-    // Get number of addresses
-    uint length = uint(registryRead(versionAddresses(_app, _version), _registry_id));
-    // Allocate space for return
-    impl = new address[](length);
-    // For each address, read it from storage and add it to the array
-    for (uint i = 0; i < length; i++) {
-      bytes32 location = bytes32(32 * (i + 1) + uint(versionAddresses(_app, _version)));
-      impl[i] = address(registryRead(location, _registry_id));
-    }
-  }
-
-  /*
-  Returns the function selectors associated with this version's implementation
-
-  @param _app: The name of the application
-  @param _version: The name of the version
-  @param _registry_id: The exec id of the registry application
-  @return sels: A bytes4 array containing all of this version's function selectors
-  */
-  function getVersionSelectors(bytes32 _app, bytes32 _version, bytes32 _registry_id) internal view returns (bytes4[] memory sels) {
-    // Get number of addresses
-    uint length = uint(registryRead(versionSelectors(_app, _version), _registry_id));
-    // Allocate space for return
-    sels = new bytes4[](length);
-    // For each address, read it from storage and add it to the array
-    for (uint i = 0; i < length; i++) {
-      bytes32 location = bytes32(32 * (i + 1) + uint(versionSelectors(_app, _version)));
-      sels[i] = bytes4(registryRead(location, _registry_id));
-    }
-  }
-
 }
 
 // File: tmp/StorageInterface.sol
@@ -1795,77 +1635,6 @@ interface StorageInterface {
   function createRegistry(address index, address implementation) external returns (bytes32 exec_id);
   function exec(address sender, bytes32 exec_id, bytes calldata)
       external payable returns (uint emitted, uint paid, uint stored);
-}
-
-// File: tmp/Proxy.sol
-
-contract Proxy {
-
-  // Registry storage
-  address public proxy_admin;
-  StorageInterface public app_storage;
-  bytes32 public registry_exec_id;
-  address public provider;
-  bytes32 public app_name;
-
-  // App storage
-  bytes32 public app_version;
-  bytes32 public app_exec_id;
-  address public app_index;
-
-  // Function selector for storage 'exec' function
-  bytes4 internal constant EXEC_SEL = bytes4(keccak256('exec(address,bytes32,bytes)'));
-
-  // Event emitted in case of a revert from storage
-  event StorageException(bytes32 indexed execution_id, string message);
-
-  // For storage refunds
-  function () external payable { }
-
-  // Constructor - sets proxy admin, as well as initial variables
-  constructor (address _storage, bytes32 _registry_exec_id, address _provider, bytes32 _app_name) public {
-    proxy_admin = msg.sender;
-    app_storage = StorageInterface(_storage);
-    registry_exec_id = _registry_exec_id;
-    provider = _provider;
-    app_name = _app_name;
-  }
-
-  // Declare abstract execution function -
-  function exec(bytes _calldata) external payable returns (bool);
-
-  // Checks to see if an error message was returned with the failed call, and emits it if so -
-  function checkErrors() internal {
-    // If the returned data begins with selector 'Error(string)', get the contained message -
-    string memory message;
-    bytes4 err_sel = bytes4(keccak256('Error(string)'));
-    assembly {
-      // Get pointer to free memory, place returned data at pointer, and update free memory pointer
-      let ptr := mload(0x40)
-      returndatacopy(ptr, 0, returndatasize)
-      mstore(0x40, add(ptr, returndatasize))
-
-      // Check value at pointer for equality with Error selector -
-      if eq(mload(ptr), and(err_sel, 0xffffffff00000000000000000000000000000000000000000000000000000000)) {
-        message := add(0x24, ptr)
-      }
-    }
-    // If no returned message exists, emit a default error message. Otherwise, emit the error message
-    if (bytes(message).length == 0)
-      emit StorageException(app_exec_id, "No error recieved");
-    else
-      emit StorageException(app_exec_id, message);
-  }
-
-  // Returns the first 4 bytes of calldata
-  function getSelector(bytes memory _calldata) internal pure returns (bytes4 selector) {
-    assembly {
-      selector := and(
-        mload(add(0x20, _calldata)),
-        0xffffffff00000000000000000000000000000000000000000000000000000000
-      )
-    }
-  }
 }
 
 // File: tmp/ScriptExec.sol
@@ -1901,7 +1670,6 @@ contract ScriptExec {
   /// EVENTS ///
 
   event AppInstanceCreated(address indexed creator, bytes32 indexed execution_id, bytes32 app_name, bytes32 version_name);
-  event StorageException(bytes32 indexed execution_id, string message);
 
   // Modifier - The sender must be the contract administrator
   modifier onlyAdmin() {
@@ -1931,8 +1699,6 @@ contract ScriptExec {
 
   /// APPLICATION EXECUTION ///
 
-  bytes4 internal constant EXEC_SEL = bytes4(keccak256('exec(address,bytes32,bytes)'));
-
   /*
   Executes an application using its execution id and storage address.
 
@@ -1940,39 +1706,17 @@ contract ScriptExec {
   @param _calldata: The calldata to forward to the application
   @return success: Whether execution succeeded or not
   */
-  function exec(bytes32 _exec_id, bytes _calldata) external payable returns (bool success);
+  function exec(bytes32 _exec_id, bytes _calldata) external payable returns (bool success) {
+    // Call 'exec' in AbstractStorage, passing in the sender's address, the app exec id, and the calldata to forward -
+    StorageInterface(app_storage).exec.value(msg.value)(msg.sender, _exec_id, _calldata);
 
-  bytes4 internal constant ERR = bytes4(keccak256('Error(string)'));
+    // Get returned data
+    success = checkReturn();
+    // If execution failed, revert -
+    require(success, 'Execution failed');
 
-  // Return the bytes4 action requestor stored at the pointer, and cleans the remaining bytes
-  function getAction(uint _ptr) internal pure returns (bytes4 action) {
-    assembly {
-      // Get the first 4 bytes stored at the pointer, and clean the rest of the bytes remaining
-      action := and(mload(_ptr), 0xffffffff00000000000000000000000000000000000000000000000000000000)
-    }
-  }
-
-  // Checks to see if an error message was returned with the failed call, and emits it if so -
-  function checkErrors(bytes32 _exec_id) internal {
-    // If the returned data begins with selector 'Error(string)', get the contained message -
-    string memory message;
-    bytes4 err_sel = ERR;
-    assembly {
-      // Get pointer to free memory, place returned data at pointer, and update free memory pointer
-      let ptr := mload(0x40)
-      returndatacopy(ptr, 0, returndatasize)
-      mstore(0x40, add(ptr, returndatasize))
-
-      // Check value at pointer for equality with Error selector -
-      if eq(mload(ptr), and(err_sel, 0xffffffff00000000000000000000000000000000000000000000000000000000)) {
-        message := add(0x24, ptr)
-      }
-    }
-    // If no returned message exists, emit a default error message. Otherwise, emit the error message
-    if (bytes(message).length == 0)
-      emit StorageException(_exec_id, "No error recieved");
-    else
-      emit StorageException(_exec_id, message);
+    // Transfer any returned wei back to the sender
+    address(msg.sender).transfer(address(this).balance);
   }
 
   // Checks data returned by an application and returns whether or not the execution changed state
@@ -2067,8 +1811,8 @@ contract ScriptExec {
   @return indx: The index address for the registry application - contains getters for the Registry, as well as its init funciton
   @return implementation: The address implementing the registry's functions
   */
-  function getRegistryImplementation() public view returns (address index, address implementation) {
-    index = StorageInterface(app_storage).getIndex(registry_exec_id);
+  function getRegistryImplementation() public view returns (address indx, address implementation) {
+    indx = StorageInterface(app_storage).getIndex(registry_exec_id);
     implementation = StorageInterface(app_storage).getTarget(registry_exec_id, REGISTER_APP_SEL);
   }
 
@@ -2106,58 +1850,6 @@ contract RegistryExec is ScriptExec {
   /// EVENTS ///
 
   event RegistryInstanceCreated(address indexed creator, bytes32 indexed execution_id, address index, address implementation);
-
-  /// APPLICATION EXECUTION ///
-
-  bytes4 internal constant EXEC_SEL = bytes4(keccak256('exec(address,bytes32,bytes)'));
-
-  /*
-  Executes an application using its execution id and storage address.
-
-  @param _exec_id: The instance exec id, which will route the calldata to the appropriate destination
-  @param _calldata: The calldata to forward to the application
-  @return success: Whether execution succeeded or not
-  */
-  function exec(bytes32 _exec_id, bytes _calldata) external payable returns (bool success) {
-    // Get function selector from calldata -
-    bytes4 sel = getSelector(_calldata);
-    // Ensure no registry functions are being called -
-    require(
-      sel != this.registerApp.selector &&
-      sel != this.registerAppVersion.selector &&
-      sel != UPDATE_INST_SEL &&
-      sel != UPDATE_EXEC_SEL
-    );
-
-    // Call 'exec' in AbstractStorage, passing in the sender's address, the app exec id, and the calldata to forward -
-    if (address(app_storage).call.value(msg.value)(abi.encodeWithSelector(
-      EXEC_SEL, msg.sender, _exec_id, _calldata
-    )) == false) {
-      // Call failed - emit error message from storage and return 'false'
-      checkErrors(_exec_id);
-      // Return unspent wei to sender
-      address(msg.sender).transfer(address(this).balance);
-      return false;
-    }
-
-    // Get returned data
-    success = checkReturn();
-    // If execution failed,
-    require(success, 'Execution failed');
-
-    // Transfer any returned wei back to the sender
-    address(msg.sender).transfer(address(this).balance);
-  }
-
-  // Returns the first 4 bytes of calldata
-  function getSelector(bytes memory _calldata) internal pure returns (bytes4 selector) {
-    assembly {
-      selector := and(
-        mload(add(0x20, _calldata)),
-        0xffffffff00000000000000000000000000000000000000000000000000000000
-      )
-    }
-  }
 
   /// REGISTRY FUNCTIONS ///
 
@@ -2240,93 +1932,6 @@ contract RegistryExec is ScriptExec {
     // Ensure zero values for emitted and paid, and nonzero value for stored -
     require(emitted == 0 && paid == 0 && stored != 0, 'Invalid state change');
   }
-
-  // Update instance selectors, index, and addresses
-  bytes4 internal constant UPDATE_INST_SEL = bytes4(keccak256('updateInstance(bytes32,bytes32,bytes32)'));
-
-  /*
-  Updates an application's implementations, selectors, and index address. Uses default app provider and registry app.
-  Uses latest app version by default.
-
-  @param _exec_id: The execution id of the application instance to be updated
-  @return success: The success of the call to the application's updateInstance function
-  */
-  function updateAppInstance(bytes32 _exec_id) external returns (bool success) {
-    // Validate input. Only the original deployer can update an application -
-    require(_exec_id != 0 && msg.sender == deployed_by[_exec_id], 'invalid sender or input');
-
-    // Get instance metadata from exec id -
-    Instance memory inst = instance_info[_exec_id];
-
-    // Call 'exec' in AbstractStorage, passing in the sender's address, the execution id, and
-    // the calldata to update the application -
-    if(address(app_storage).call(
-      abi.encodeWithSelector(EXEC_SEL,            // 'exec' selector
-        inst.current_provider,                    // application provider address
-        _exec_id,                                 // execution id to update
-        abi.encodeWithSelector(UPDATE_INST_SEL,   // calldata for Registry updateInstance function
-          inst.app_name,                          // name of the applcation used by the instance
-          inst.version_name,                      // name of the current version of the application
-          inst.current_registry_exec_id           // registry exec id when the instance was instantiated
-        )
-      )
-    ) == false) {
-      // Call failed - emit error message from storage and return 'false'
-      checkErrors(_exec_id);
-      return false;
-    }
-    // Check returned data to ensure state was correctly changed in AbstractStorage -
-    success = checkReturn();
-    // If execution failed, revert state and return an error message -
-    require(success, 'Execution failed');
-
-    // If execution was successful, the version was updated. Get the latest version
-    // and set the exec id instance info -
-    address registry_idx = StorageInterface(app_storage).getIndex(inst.current_registry_exec_id);
-    bytes32 latest_version  = RegistryInterface(registry_idx).getLatestVersion(
-      app_storage,
-      inst.current_registry_exec_id,
-      inst.current_provider,
-      inst.app_name
-    );
-    // Ensure nonzero latest version -
-    require(latest_version != 0, 'invalid latest version');
-    // Set current version -
-    instance_info[_exec_id].version_name = latest_version;
-  }
-
-  // Update instance script exec contract
-  bytes4 internal constant UPDATE_EXEC_SEL = bytes4(keccak256('updateExec(address)'));
-
-  /*
-  Updates an application's script executor from this Script Exec to a new address
-
-  @param _exec_id: The execution id of the application instance to be updated
-  @param _new_exec_addr: The new script exec address for this exec id
-  @returns success: The success of the call to the application's updateExec function
-  */
-  function updateAppExec(bytes32 _exec_id, address _new_exec_addr) external returns (bool success) {
-    // Validate input. Only the original deployer can migrate the script exec address -
-    require(_exec_id != 0 && msg.sender == deployed_by[_exec_id] && address(this) != _new_exec_addr && _new_exec_addr != 0, 'invalid input');
-
-    // Call 'exec' in AbstractStorage, passing in the sender's address, the execution id, and
-    // the calldata to migrate the script exec address -
-    if(address(app_storage).call(
-      abi.encodeWithSelector(EXEC_SEL,                            // 'exec' selector
-        msg.sender,                                               // sender address
-        _exec_id,                                                 // execution id to update
-        abi.encodeWithSelector(UPDATE_EXEC_SEL, _new_exec_addr)   // calldata for Registry updateExec
-      )
-    ) == false) {
-      // Call failed - emit error message from storage and return 'false'
-      checkErrors(_exec_id);
-      return false;
-    }
-    // Check returned data to ensure state was correctly changed in AbstractStorage -
-    success = checkReturn();
-    // If execution failed, revert state and return an error message -
-    require(success, 'Execution failed');
-  }
 }
 
 // File: tmp/ArrayUtils.sol
@@ -2338,10 +1943,6 @@ library ArrayUtils {
   }
 
   function toAddressArr(bytes32[] memory _arr) internal pure returns (address[] memory _conv) {
-    assembly { _conv := _arr }
-  }
-
-  function toUintArr(bytes32[] memory _arr) internal pure returns (uint[] memory _conv) {
     assembly { _conv := _arr }
   }
 }
@@ -2363,8 +1964,9 @@ library RegistryIdx {
   bytes32 internal constant EXEC_PERMISSIONS = keccak256('script_exec_permissions');
 
   // Returns the storage location of a script execution address's permissions -
-  function execPermissions(address _exec) internal pure returns (bytes32)
-    { return keccak256(_exec, EXEC_PERMISSIONS); }
+  function execPermissions(address _exec) internal pure returns (bytes32 location) {
+    location = keccak256(_exec, EXEC_PERMISSIONS);
+  }
 
   // Simple init function - sets the sender as a script executor for this instance
   function init() external view {
@@ -2379,32 +1981,39 @@ library RegistryIdx {
   }
 
   // Returns the location of a provider's list of registered applications in storage
-  function registeredApps(address _provider) internal pure returns (bytes32)
-    { return keccak256(bytes32(_provider), 'app_list'); }
+  function registeredApps(address _provider) internal pure returns (bytes32 location) {
+    location = keccak256(bytes32(_provider), 'app_list');
+  }
 
   // Returns the location of a registered app's name under a provider
-  function appBase(bytes32 _app, address _provider) internal pure returns (bytes32)
-    { return keccak256(_app, keccak256(bytes32(_provider), 'app_base')); }
+  function appBase(bytes32 _app, address _provider) internal pure returns (bytes32 location) {
+    location = keccak256(_app, keccak256(bytes32(_provider), 'app_base'));
+  }
 
   // Returns the location of an app's list of versions
-  function appVersionList(bytes32 _app, address _provider) internal pure returns (bytes32)
-    { return keccak256('versions', appBase(_app, _provider)); }
+  function appVersionList(bytes32 _app, address _provider) internal pure returns (bytes32 location) {
+    location = keccak256('versions', appBase(_app, _provider));
+  }
 
   // Returns the location of a version's name
-  function versionBase(bytes32 _app, bytes32 _version, address _provider) internal pure returns (bytes32)
-    { return keccak256(_version, 'version', appBase(_app, _provider)); }
+  function versionBase(bytes32 _app, bytes32 _version, address _provider) internal pure returns (bytes32 location) {
+    location = keccak256(_version, 'version', appBase(_app, _provider));
+  }
 
   // Returns the location of a registered app's index address under a provider
-  function versionIndex(bytes32 _app, bytes32 _version, address _provider) internal pure returns (bytes32)
-    { return keccak256('index', versionBase(_app, _version, _provider)); }
+  function versionIndex(bytes32 _app, bytes32 _version, address _provider) internal pure returns (bytes32 location) {
+    location = keccak256('index', versionBase(_app, _version, _provider));
+  }
 
   // Returns the location of an app's function selectors, registered under a provider
-  function versionSelectors(bytes32 _app, bytes32 _version, address _provider) internal pure returns (bytes32)
-    { return keccak256('selectors', versionBase(_app, _version, _provider)); }
+  function versionSelectors(bytes32 _app, bytes32 _version, address _provider) internal pure returns (bytes32 location) {
+    location = keccak256('selectors', versionBase(_app, _version, _provider));
+  }
 
   // Returns the location of an app's implementing addresses, registered under a provider
-  function versionAddresses(bytes32 _app, bytes32 _version, address _provider) internal pure returns (bytes32)
-    { return keccak256('addresses', versionBase(_app, _version, _provider)); }
+  function versionAddresses(bytes32 _app, bytes32 _version, address _provider) internal pure returns (bytes32 location) {
+    location = keccak256('addresses', versionBase(_app, _version, _provider));
+  }
 
   // Return a list of applications registered by the address given
   function getApplications(address _storage, bytes32 _exec_id, address _provider) external view returns (bytes32[] memory) {
@@ -2468,19 +2077,5 @@ library RegistryIdx {
       arr_indices[i - 1] = bytes32((32 * i) + seed);
 
     implementations = target.readMulti(_exec_id, arr_indices).toAddressArr();
-  }
-}
-
-// File: tmp/StringUtils.sol
-
-library StringUtils {
-
-  function toStr(bytes32 _val) internal pure returns (string memory str) {
-    assembly {
-      str := mload(0x40)
-      mstore(str, 0x20)
-      mstore(add(0x20, str), _val)
-      mstore(0x40, add(0x40, str))
-    }
   }
 }
