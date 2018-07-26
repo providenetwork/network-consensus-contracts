@@ -17,5 +17,10 @@ module.exports = {
   },
   mocha: {
     reporter: 'mochawesome'
+  },
+  solc: {
+    optimizer: {
+      enabled: true, runs: 200
+    }
   }
 };
