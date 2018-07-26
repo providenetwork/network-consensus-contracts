@@ -12,6 +12,10 @@ library InitBridges {
   // Bridges console
 
   function init() public pure returns (bytes memory store_data) {
+    uint ptr;
+    ptr = ptr.clear();
+    ptr.stores();
 
+    store_data = ptr.toBuffer();
   }
 }
