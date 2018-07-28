@@ -20,6 +20,8 @@ library Aura {
   bytes32 internal constant MAX_VALIDATOR_COUNT = keccak256("max_validator_count");
 
   bytes32 internal constant VALIDATOR_NAME = keccak256("validator_name");
+  bytes32 internal constant VALIDATOR_EMAIL = keccak256("validator_email");
+  bytes32 internal constant VALIDATOR_PHONE = keccak256("validator_phone");
   bytes32 internal constant VALIDATOR_SEALING_PUBLIC_KEY = keccak256("validator_sealing_public_key");
   bytes32 internal constant VALIDATOR_PAYOUT_PUBLIC_KEY = keccak256("validator_payout_public_key");
   bytes32 internal constant VALIDATOR_VOTING_PUBLIC_KEY = keccak256("validator_voting_public_key");
@@ -28,6 +30,7 @@ library Aura {
   bytes32 internal constant VALIDATOR_ADDRESS_CITY = keccak256("validator_address_city");
   bytes32 internal constant VALIDATOR_ADDRESS_STATE = keccak256("validator_address_state");
   bytes32 internal constant VALIDATOR_ADDRESS_POSTAL_CODE = keccak256("validator_address_postal_code");
+  bytes32 internal constant VALIDATOR_ADDRESS_COUNTRY = keccak256("validator_address_country");
   bytes32 internal constant VALIDATOR_INDEX = keccak256("validator_index");
   bytes32 internal constant VALIDATOR_IS_VALIDATOR = keccak256("validator_is_validator");
 
@@ -209,28 +212,41 @@ library Aura {
     bytes32 _exec_id,
     address _validator
   ) public view returns(bytes32[] memory _validator_name,
+                        bytes32[] memory _validator_email,
                         bytes32[] memory _validator_address_line_1,
                         bytes32[] memory _validator_address_line_2,
                         bytes32[] memory _validator_city,
                         bytes32 _validator_state,
-                        bytes32 _validator_postal_code) {
+                        bytes32 _validator_postal_code,
+                        bytes32 _validator_country,
+                        bytes32 _validator_phone) {
     uint ptr = MemoryBuffers.cdBuff(RD_MULTI);
     ptr.cdPush(_exec_id);
     ptr.cdPush(0x40);
     ptr.cdPush(keccak256(_validator, VALIDATOR_ADDRESS_STATE));
     ptr.cdPush(keccak256(_validator, VALIDATOR_ADDRESS_POSTAL_CODE));
+    ptr.cdPush(keccak256(_validator, VALIDATOR_ADDRESS_COUNTRY));
+    ptr.cdPush(keccak256(_validator, VALIDATOR_PHONE));
 
     bytes32[] memory _retvals = ptr.readMultiFrom(_storage);
-    assert(_retvals.length == 2);
+    assert(_retvals.length == 4);
 
     _validator_state = _retvals[0];
     _validator_postal_code = _retvals[1];
+    _validator_phone = _retvals[2];
+    _validator_country = _retvals[3];
 
     ptr.cdOverwrite(RD_MULTI);
     ptr.cdPush(_exec_id);
     ptr.cdPush(0x40);
     ptr.cdPush(keccak256(_validator, VALIDATOR_NAME));
     _validator_name = ptr.readMultiFrom(_storage);
+
+    ptr.cdOverwrite(RD_MULTI);
+    ptr.cdPush(_exec_id);
+    ptr.cdPush(0x40);
+    ptr.cdPush(keccak256(_validator, VALIDATOR_EMAIL));
+    _validator_email = ptr.readMultiFrom(_storage);
 
     ptr.cdOverwrite(RD_MULTI);
     ptr.cdPush(_exec_id);
