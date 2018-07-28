@@ -29,6 +29,7 @@ contract NetworkConsensus {
     bytes4 internal constant GET_VALIDATORS_SEL = bytes4(keccak256("getValidators(address,bytes32)"));
     bytes4 internal constant GET_VALIDATOR_COUNT_SEL = bytes4(keccak256("getValidatorCount(address,bytes32)"));
     bytes4 internal constant GET_VALIDATOR_CONSOLE_SEL = bytes4(keccak256("getValidatorConsole(address,bytes32)"));
+    bytes4 internal constant GET_VALIDATOR_METADATA_SEL = bytes4(keccak256("getValidatorMetadata(address,bytes32,address)"));
     bytes4 internal constant GET_VALIDATOR_SUPPORT_COUNT_SEL = bytes4(keccak256("getValidatorSupportCount(address,bytes32,address)"));
     bytes4 internal constant GET_VALIDATOR_SUPPORT_DIVISOR_SEL = bytes4(keccak256("getValidatorSupportDivisor(address,bytes32)"));
     bytes4 internal constant GET_VOTING_CONSOLE_SEL = bytes4(keccak256("getVotingConsole(address,bytes32)"));
@@ -296,6 +297,29 @@ contract NetworkConsensus {
 
     function getValidatorIndex(address _validator) internal view returns (uint _validator_index) {
         bytes4 _get_validator_index_sel = GET_VALIDATOR_INDEX_SEL;
+        address _delegate = getDelegate();
+        address _registry_storage = RegistryExec(registry).default_storage();
+        bytes32 _exec_id = appExecId;
+        assembly {
+            let ptr := mload(0x40)
+            mstore(ptr, _get_validator_index_sel)
+            mstore(add(0x04, ptr), _registry_storage)
+            mstore(add(0x24, ptr), _exec_id)
+            mstore(add(0x44, ptr), _validator)
+            let ret := staticcall(gas, _delegate, ptr, 0x64, 0, 0)
+            returndatacopy(0, 0, returndatasize)
+            return(0, returndatasize)
+        }
+    }
+
+    function getValidatorMetadata(address _validator) internal view 
+    returns(bytes32[] memory _validator_name,
+            bytes32[] memory _validator_address_line_1,
+            bytes32[] memory _validator_address_line_2,
+            bytes32[] memory _validator_city,
+            bytes32 _validator_state,
+            bytes32 _validator_postal_code) {
+        bytes4 _get_validator_index_sel = GET_VALIDATOR_METADATA_SEL;
         address _delegate = getDelegate();
         address _registry_storage = RegistryExec(registry).default_storage();
         bytes32 _exec_id = appExecId;
