@@ -508,7 +508,7 @@ contract NetworkConsensus {
         }
     }
 
-    function getValidatorConsole() internal view returns (address) {
+    function getValidatorConsole() public view returns (address) {
         bytes4 _get_validator_console_sel = GET_VALIDATOR_CONSOLE_SEL;
         address _delegate = getDelegate();
         address _registry_storage = RegistryExec(registry).default_storage();
@@ -527,7 +527,7 @@ contract NetworkConsensus {
         }
     }
 
-    function getVotingConsole() internal view returns (address) {
+    function getVotingConsole() public view returns (address) {
         bytes4 _get_voting_console_sel = GET_VOTING_CONSOLE_SEL;
         address _delegate = getDelegate();
         address _registry_storage = RegistryExec(registry).default_storage();
