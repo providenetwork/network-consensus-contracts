@@ -314,11 +314,14 @@ contract NetworkConsensus {
 
     function getValidatorMetadata(address _validator) public view 
     returns(bytes32[] memory _validator_name,
+            bytes32[] memory _validator_email,
             bytes32[] memory _validator_address_line_1,
             bytes32[] memory _validator_address_line_2,
             bytes32[] memory _validator_city,
             bytes32 _validator_state,
-            bytes32 _validator_postal_code) {
+            bytes32 _validator_postal_code,
+            bytes32 _validator_country,
+            bytes32 _validator_phone) {
         bytes4 _get_validator_index_sel = GET_VALIDATOR_METADATA_SEL;
         address _delegate = getDelegate();
         address _registry_storage = RegistryExec(registry).default_storage();
