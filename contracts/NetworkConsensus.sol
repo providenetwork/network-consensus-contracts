@@ -312,7 +312,7 @@ contract NetworkConsensus {
         }
     }
 
-    function getValidatorMetadata(address _validator) internal view 
+    function getValidatorMetadata(address _validator) public view 
     returns(bytes32[] memory _validator_name,
             bytes32[] memory _validator_address_line_1,
             bytes32[] memory _validator_address_line_2,
