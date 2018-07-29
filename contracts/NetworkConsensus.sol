@@ -40,11 +40,13 @@ contract NetworkConsensus {
     bytes4 internal constant GET_BALLOTS_SEL = bytes4(keccak256("getBallots(address,bytes32)"));
     bytes4 internal constant GET_FINALIZED_SEL = bytes4(keccak256("getFinalized(address,bytes32)"));
 
-    bytes4 internal constant ADD_ARBITRARY_PROPOSAL_SEL = bytes4(keccak256("addArbitraryProposal(address,uint,uint,uint,bytes,bytes,bytes)"));
+    bytes4 internal constant ADD_ARBITRARY_PROPOSAL_SEL = bytes4(keccak256("addArbitraryProposal(address,bytes32,address,uint,uint,uint,bytes,bytes,bytes)"));
     bytes4 internal constant ADD_PROPOSAL_SEL = bytes4(keccak256("addProposal(address,uint,uint,uint,bytes,bytes,bytes32[])"));
     bytes4 internal constant ADD_VALIDATOR_SEL = bytes4(keccak256("addValidator(address,uint)"));
     bytes4 internal constant FINALIZE_CHANGE_SEL = bytes4(keccak256("finalizeChange()"));
     bytes4 internal constant FINALIZE_CONSENSUS_VERSION_SEL = bytes4(keccak256("finalizeConsensusVersion(bytes32,bytes32,address,bytes4,bytes,bytes)"));
+    bytes4 internal constant GET_PROPOSALS_SEL = bytes4(keccak256("getProposals(address,bytes32)"));
+    bytes4 internal constant GET_PROPOSALS_COUNT_SEL = bytes4(keccak256("getProposalsCount(address,bytes32)"));
     bytes4 internal constant REMOVE_VALIDATOR_SEL = bytes4(keccak256("removeValidator(address)"));
     bytes4 internal constant REPORT_BENIGN_SEL = bytes4(keccak256("report(address,uint,bool,bytes)"));
     bytes4 internal constant REPORT_MALICIOUS_SEL = bytes4(keccak256("report(address,uint,bool,bytes)"));
@@ -155,7 +157,7 @@ contract NetworkConsensus {
             finalizeConsensusVersion(_app_name, _version_name, _init, _init_sel, _init_calldata, _init_desc);
         } else if (_voting_console != address(0)) {
             bytes memory _finalize_calldata = abi.encodeWithSelector(FINALIZE_CONSENSUS_VERSION_SEL, _app_name, _version_name, _init, _init_sel, _init_calldata, _init_desc);
-            bytes memory _add_proposal_calldata = abi.encodeWithSelector(ADD_ARBITRARY_PROPOSAL_SEL, msg.sender, this, uint(1), now, now + 90 days, "Upgrade consensus", _version_desc, _finalize_calldata);
+            bytes memory _add_proposal_calldata = abi.encodeWithSelector(ADD_ARBITRARY_PROPOSAL_SEL, RegistryExec(registry).default_storage(), appExecId, msg.sender, this, uint(1), now, now + 90 days, "Upgrade consensus", _version_desc, _finalize_calldata);
             RegistryExec(registry).exec(_voting_console, _add_proposal_calldata);
         }
     }
@@ -400,6 +402,44 @@ contract NetworkConsensus {
         }
     }
 
+    function getProposals() public view returns (address[] memory _proposals) {
+        bytes4 _get_proposals_sel = GET_PROPOSALS_SEL;
+        address _delegate = getDelegate();
+        if (_delegate != address(0)) {
+            address _registry_storage = RegistryExec(registry).default_storage();
+            bytes32 _exec_id = appExecId;
+            assembly {
+                let ptr := mload(0x40)
+                mstore(ptr, _get_proposals_sel)
+                mstore(add(0x04, ptr), _registry_storage)
+                mstore(add(0x24, ptr), _exec_id)
+                let ret := staticcall(gas, _delegate, ptr, 0x44, 0, 0)
+                returndatacopy(0, 0, returndatasize)
+                return(0, returndatasize)
+            }
+        }
+    }
+
+    function getProposalsCount() public view returns (uint) {
+        bytes4 _get_proposals_count_sel = GET_PROPOSALS_COUNT_SEL;
+        address _delegate = getDelegate();
+        if (_delegate == address(0)) {
+            return 0;
+        } else {
+            address _registry_storage = RegistryExec(registry).default_storage();
+            bytes32 _exec_id = appExecId;
+            assembly {
+                let ptr := mload(0x40)
+                mstore(ptr, _get_proposals_count_sel)
+                mstore(add(0x04, ptr), _registry_storage)
+                mstore(add(0x24, ptr), _exec_id)
+                let ret := staticcall(gas, _delegate, ptr, 0x44, 0, 0)
+                returndatacopy(0, 0, returndatasize)
+                return(0, returndatasize)
+            }
+        }
+    }
+
     function finalizeChange() public onlySystem() onlyNotFinalized() {
         address _validator_console = getValidatorConsole();
         if (_validator_console == address(0)) {
@@ -438,7 +478,7 @@ contract NetworkConsensus {
 	// 	} 
     // }
 
-    function addValidator(address _validator) public isSupportedByMajority(_validator) { // isNotValidator(_validator) 
+    function addValidator(address _validator) public isNotValidator(_validator)  isSupportedByMajority(_validator) {
         address[] memory _pendingValidators = getPendingValidators();
 
         bytes memory _add_validator_calldata = abi.encodeWithSelector(ADD_VALIDATOR_SEL, _validator, _pendingValidators.length);

@@ -17,6 +17,7 @@ library VotingConsole {
   bytes32 internal constant FINALIZED = keccak256("finalized");
   bytes32 internal constant PROPOSAL = keccak256("proposal");
   bytes32 internal constant PROPOSALS = keccak256("proposals");
+  bytes32 internal constant PROPOSALS_COUNT = keccak256("proposals_count");
   bytes32 internal constant PROPOSED_CALLDATA = keccak256("proposed_calldata");
   bytes32 internal constant PROPOSED_TARGET = keccak256("proposed_target");
   bytes32 internal constant START_TIMESTAMP = keccak256("start_timestamp");
@@ -34,6 +35,8 @@ library VotingConsole {
   bytes4 internal constant GET_PROPOSAL_CANDIDATE_VOTECOUNT_SEL = bytes4(keccak256("getProposalCandidateVoteCount(address,bytes32,bytes32,bytes32)"));
   bytes4 internal constant GET_PROPOSAL_VOTECOUNT_SEL = bytes4(keccak256("getProposalVoteCount(address,bytes32,bytes32)"));
 
+  bytes4 internal constant GET_PROPOSALS_COUNT_SEL = bytes4(keccak256("getProposalsCount(address,bytes32)"));
+
   bytes4 internal constant RD_SING = bytes4(keccak256("read(bytes32,bytes32)"));
   bytes4 internal constant RD_MULTI = bytes4(keccak256("readMulti(bytes32,bytes32[])"));
 
@@ -41,6 +44,7 @@ library VotingConsole {
 
   /*
   Add a proposal for voting.
+  @param _index: The index of the new proposal
   @param _creator: The address creating the new proposal
   @param _nonce: The proposal nonce-- enforced per creator
   @param _start_timestamp: The starting unix timestamp, at which point the proposal is open for voting
@@ -51,6 +55,7 @@ library VotingConsole {
   @return store_data: A formatted storage request
   */
   function addProposal(
+    uint _index,
     address _creator,
     uint _nonce,
     uint _start_timestamp,
@@ -58,15 +63,20 @@ library VotingConsole {
     bytes memory _title,
     bytes memory _data,
     bytes32[] memory _candidates
-  ) public pure returns (bytes memory store_data) {
+  ) public view returns (bytes memory store_data) {
     bytes32 _proposal_id = keccak256(_creator, keccak256(_title, _nonce));
-    return buildProposal(_proposal_id, _creator, _start_timestamp, _expiry_timestamp, _title, _data, _candidates).getBuffer();
+    uint ptr = buildProposal(_proposal_id, _creator, _start_timestamp, _expiry_timestamp, _title, _data, _candidates);
+
+    ptr.store(keccak256(PROPOSALS_COUNT, _index + 1));
+
+    store_data = ptr.getBuffer();
   }
 
   /*
   Add an arbitrary proposal for voting. The proposal is arbitrary in that it is created with
   arbitrary calldata and a target, which is executed if the proposal passes voting. Use this
   method to create a proposal that will result in a contract execution if the vote passes.
+  @param _index: The index of the new proposal
   @param _creator: The address creating the new proposal
   @param _proposed_target: The proposed target address to which the proposed calldata will be dispatched upon successful vote
   @param _nonce: The proposal nonce-- enforced per creator
@@ -78,6 +88,7 @@ library VotingConsole {
   @return store_data: A formatted storage request
   */
   function addArbitraryProposal(
+    uint _index,
     address _creator,
     address _proposed_target,
     uint _nonce,
@@ -86,7 +97,7 @@ library VotingConsole {
     bytes memory _title,
     bytes memory _data,
     bytes memory _proposed_calldata
-  ) public pure returns (bytes memory store_data) {
+  ) public view returns (bytes memory store_data) {
     bytes32 _proposal_id = keccak256(_creator, keccak256(_title, _nonce));
 
     bytes32[] memory _candidates = new bytes32[](2);  // binary option
@@ -100,6 +111,8 @@ library VotingConsole {
 
     ptr.store(keccak256(keccak256(_proposal_id, PROPOSAL), PROPOSED_CALLDATA));
     ptr.storeBytesAt(_proposed_calldata, keccak256(keccak256(_proposal_id, PROPOSAL), PROPOSED_CALLDATA));
+
+    ptr.store(keccak256(PROPOSALS_COUNT, _index + 1));
 
     store_data = ptr.getBuffer();
   }

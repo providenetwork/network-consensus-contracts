@@ -54,6 +54,7 @@ library Aura {
   bytes32 internal constant DATA = keccak256("data");
   bytes32 internal constant PROPOSAL = keccak256("proposal");
   bytes32 internal constant PROPOSALS = keccak256("proposals");
+  bytes32 internal constant PROPOSALS_COUNT = keccak256("proposals_count");
   bytes32 internal constant PROPOSED_CALLDATA = keccak256("proposed_calldata");
   bytes32 internal constant PROPOSED_TARGET = keccak256("proposed_target");
   bytes32 internal constant START_TIMESTAMP = keccak256("start_timestamp");
@@ -340,6 +341,38 @@ library Aura {
   }
 
   // Voting console getters
+
+  function getProposals(
+    address _storage, 
+    bytes32 _exec_id
+  ) public view returns (address[] memory) {
+    require(_storage != address(0) && _exec_id != bytes32(0));
+
+    uint _proposals_count = getProposalsCount(_storage, _exec_id);
+
+    uint ptr = MemoryBuffers.cdBuff(RD_MULTI);
+    ptr.cdPush(_exec_id);
+    ptr.cdPush(0x40);
+    ptr.cdPush(bytes32(_proposals_count));
+
+    // Loop over list length and place each index storage location in buffer
+    for (uint i = 0; i < _proposals_count; i++) {
+      ptr.cdPush(bytes32((32 * (i + 1)) + uint(PROPOSALS)));
+    }
+
+    return readMultiAddressFrom(ptr, _storage);
+  }
+
+  function getProposalsCount(
+    address _storage, 
+    bytes32 _exec_id
+  ) public view returns (uint) {
+    require(_storage != address(0) && _exec_id != bytes32(0));
+    uint ptr = MemoryBuffers.cdBuff(RD_SING);
+    ptr.cdPush(_exec_id);
+    ptr.cdPush(PROPOSALS_COUNT);
+    return uint(ptr.readSingleFrom(_storage));
+  }
 
   function getProposalCandidates(
     address _storage,
