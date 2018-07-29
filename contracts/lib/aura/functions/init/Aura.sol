@@ -12,12 +12,14 @@ library Aura {
 
   // Validator console
 
-  uint internal constant DEFAULT_MAX_VALIDATOR_COUNT = 25;
+  uint internal constant DEFAULT_MIN_KEY_CEREMONY_VALIDATORS = 12;
+  uint internal constant DEFAULT_MAX_VALIDATOR_COUNT = 1024;
   uint internal constant DEFAULT_VALIDATOR_SUPPORT_DIVISOR = 2;
 
   bytes32 internal constant FINALIZED = keccak256("finalized");
   bytes32 internal constant MASTER_OF_CEREMONY = keccak256("master_of_ceremony");
   bytes32 internal constant MAX_VALIDATOR_COUNT = keccak256("max_validator_count");
+  bytes32 internal constant MIN_VALIDATOR_COUNT = keccak256("min_validator_count");
 
   bytes32 internal constant VALIDATOR_NAME = keccak256("validator_name");
   bytes32 internal constant VALIDATOR_EMAIL = keccak256("validator_email");
@@ -89,6 +91,7 @@ library Aura {
     ptr.store(bytes32(_master_of_ceremony)).at(MASTER_OF_CEREMONY);
     ptr.store(bytes32(1)).at(keccak256(_master_of_ceremony, VALIDATOR_SUPPORT_COUNT));
 
+    ptr.store(bytes32(DEFAULT_MIN_KEY_CEREMONY_VALIDATORS)).at(MIN_VALIDATOR_COUNT);
     ptr.store(bytes32(DEFAULT_MAX_VALIDATOR_COUNT)).at(MAX_VALIDATOR_COUNT);
     ptr.store(bytes32(DEFAULT_VALIDATOR_SUPPORT_DIVISOR)).at(VALIDATOR_SUPPORT_DIVISOR);
 
@@ -132,6 +135,17 @@ library Aura {
     uint ptr = MemoryBuffers.cdBuff(RD_SING);
     ptr.cdPush(_exec_id);
     ptr.cdPush(MAX_VALIDATOR_COUNT);
+    return uint(ptr.readSingleFrom(_storage));
+  }
+
+  function getMinimumValidatorCount(
+    address _storage, 
+    bytes32 _exec_id
+  ) public view returns (uint) {
+    require(_storage != address(0) && _exec_id != bytes32(0));
+    uint ptr = MemoryBuffers.cdBuff(RD_SING);
+    ptr.cdPush(_exec_id);
+    ptr.cdPush(MIN_VALIDATOR_COUNT);
     return uint(ptr.readSingleFrom(_storage));
   }
 

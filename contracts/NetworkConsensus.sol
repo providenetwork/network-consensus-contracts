@@ -24,6 +24,7 @@ contract NetworkConsensus {
     // App selectors
 
     bytes4 internal constant GET_MAX_VALIDATOR_COUNT_SEL = bytes4(keccak256("getMaximumValidatorCount(address,bytes32)"));
+    bytes4 internal constant GET_MIN_VALIDATOR_COUNT_SEL = bytes4(keccak256("getMinimumValidatorCount(address,bytes32)"));
     bytes4 internal constant GET_VALIDATOR_SEL = bytes4(keccak256("getValidator(address,bytes32,address)"));
     bytes4 internal constant GET_VALIDATOR_INDEX_SEL = bytes4(keccak256("getValidatorIndex(address,bytes32,address)"));
     bytes4 internal constant GET_VALIDATORS_SEL = bytes4(keccak256("getValidators(address,bytes32)"));
@@ -55,6 +56,7 @@ contract NetworkConsensus {
 
     // State
 
+    bool internal completedInitialKeyCeremony;
     address public masterOfCeremony;
     address internal registry;
     bytes32 internal registryExecId;
@@ -254,6 +256,26 @@ contract NetworkConsensus {
         }
     }
 
+    function getMinimumValidatorCount() public view returns (uint) {
+        bytes4 _get_validator_count_sel = GET_MIN_VALIDATOR_COUNT_SEL;
+        address _delegate = getDelegate();
+        if (_delegate == address(0)) {
+            return getValidators().length;
+        } else {
+            address _registry_storage = RegistryExec(registry).default_storage();
+            bytes32 _exec_id = appExecId;
+            assembly {
+                let ptr := mload(0x40)
+                mstore(ptr, _get_validator_count_sel)
+                mstore(add(0x04, ptr), _registry_storage)
+                mstore(add(0x24, ptr), _exec_id)
+                let ret := staticcall(gas, _delegate, ptr, 0x44, 0, 0)
+                returndatacopy(0, 0, returndatasize)
+                return(0, returndatasize)
+            }
+        }
+    }
+
     function getValidators() public view returns (address[] memory _validators) {
         bytes4 _get_validators_sel = GET_VALIDATORS_SEL;
         address _delegate = getDelegate();
@@ -416,7 +438,7 @@ contract NetworkConsensus {
 	// 	} 
     // }
 
-    function addValidator(address _validator) public isNotValidator(_validator) isSupportedByMajority(_validator) {
+    function addValidator(address _validator) public isSupportedByMajority(_validator) { // isNotValidator(_validator) 
         address[] memory _pendingValidators = getPendingValidators();
 
         bytes memory _add_validator_calldata = abi.encodeWithSelector(ADD_VALIDATOR_SEL, _validator, _pendingValidators.length);
@@ -430,6 +452,10 @@ contract NetworkConsensus {
 
         bytes memory _set_pending_validators_calldata = abi.encodeWithSelector(SET_PENDING_VALIDATORS_SEL, _newPendingValidators);
         RegistryExec(registry).exec(getValidatorConsole(), _set_pending_validators_calldata);
+
+        if (_newPendingValidators.length == getMinimumValidatorCount()) {
+            completedInitialKeyCeremony = true;
+        }
 
         // bytes memory _set_validator_support_calldata = abi.encodeWithSelector(SET_VALIDATOR_SUPPORT_SEL, RegistryExec(registry).default_storage(), appExecId, _validator, _validator, true);
         // RegistryExec(registry).exec(getValidatorConsole(), _set_validator_support_calldata);
@@ -456,7 +482,7 @@ contract NetworkConsensus {
         bytes memory _remove_validator_calldata = abi.encodeWithSelector(REMOVE_VALIDATOR_SEL, _validator);
         RegistryExec(registry).exec(getValidatorConsole(), _remove_validator_calldata);
 
-        //revokeAllSupported(_validator);
+        // revokeAllSupported(_validator);
 		initiateChange();
 	}
 
@@ -547,7 +573,11 @@ contract NetworkConsensus {
     }
 
     modifier isSupportedByMajority(address _validator) {
-        require(getValidatorSupportCount(_validator) > getPendingValidatorCount() / getValidatorSupportDivisor());
+        if (!completedInitialKeyCeremony && getPendingValidatorCount() < getMinimumValidatorCount()) {
+            require(msg.sender == masterOfCeremony);
+        } else {
+            require(getValidatorSupportCount(_validator) > getPendingValidatorCount() / getValidatorSupportDivisor());
+        }
         _;
     }
 
@@ -598,6 +628,11 @@ contract NetworkConsensus {
 		require(_is_validator_retval == bytes32(0));
 		_;
     }
+
+    modifier withinMinimumValidatorLimit() {
+		require(getPendingValidatorCount() >= getMinimumValidatorCount());
+		_;
+	}
 
     modifier withinMaximumValidatorLimit() {
 		require(getPendingValidatorCount() < getMaximumValidatorCount());
