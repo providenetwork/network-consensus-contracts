@@ -108,13 +108,23 @@ contract NetworkConsensus {
         address _validator_console,
         address _voting_console
     ) private {
-        bytes4[] memory _consensus_fn_sels = new bytes4[](2);
+        bytes4[] memory _consensus_fn_sels = new bytes4[](7);
         _consensus_fn_sels[0] = ADD_VALIDATOR_SEL;
-        _consensus_fn_sels[1] = ADD_PROPOSAL_SEL;
+        _consensus_fn_sels[1] = FINALIZE_CHANGE_SEL;
+        _consensus_fn_sels[2] = REMOVE_VALIDATOR_SEL;
+        _consensus_fn_sels[3] = SET_VALIDATORS_SEL;
+        _consensus_fn_sels[4] = SET_VALIDATOR_INDEX_SEL;
+        _consensus_fn_sels[5] = SET_PENDING_VALIDATORS_SEL;
+        _consensus_fn_sels[6] = ADD_PROPOSAL_SEL;
 
-        address[] memory _consensus_fn_addrs = new address[](2);
+        address[] memory _consensus_fn_addrs = new address[](7);
         _consensus_fn_addrs[0] = _validator_console;
-        _consensus_fn_addrs[1] = _voting_console;
+        _consensus_fn_addrs[1] = _validator_console;
+        _consensus_fn_addrs[2] = _validator_console;
+        _consensus_fn_addrs[3] = _validator_console;
+        _consensus_fn_addrs[4] = _validator_console;
+        _consensus_fn_addrs[5] = _validator_console;
+        _consensus_fn_addrs[6] = _voting_console;
 
         bytes memory _init_app_calldata = abi.encodeWithSelector(
             DEFAULT_CONSENSUS_APP_INIT_SEL,
@@ -478,7 +488,7 @@ contract NetworkConsensus {
 	// 	} 
     // }
 
-    function addValidator(address _validator) public isNotValidator(_validator)  isSupportedByMajority(_validator) {
+    function addValidator(address _validator) public { //isNotValidator(_validator) isSupportedByMajority(_validator) {
         address[] memory _pendingValidators = getPendingValidators();
 
         bytes memory _add_validator_calldata = abi.encodeWithSelector(ADD_VALIDATOR_SEL, _validator, _pendingValidators.length);
