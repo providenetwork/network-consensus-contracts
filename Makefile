@@ -14,10 +14,11 @@ flat: clean
 
 	cp contracts/*.sol tmp/
 	cp contracts/lib/*.sol tmp/
-	cp contracts/lib/aura/functions/*.sol tmp/
-	cp contracts/lib/aura/functions/init/* tmp/
-	cp contracts/lib/bridges/functions/*.sol tmp/
-	cp contracts/lib/bridges/functions/init/* tmp/
+	cp contracts/lib/aura/contracts/*.sol tmp/
+	cp contracts/lib/aura/contracts/classes/validators/* tmp/
+	cp contracts/lib/aura/contracts/classes/voting/* tmp/
+	cp contracts/lib/bridges/contracts/*.sol tmp/
+	cp contracts/lib/bridges/contracts/classes/* tmp/
 
 	rm tmp/Migrations.sol
 

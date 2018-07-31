@@ -1,13 +1,9 @@
 pragma solidity ^0.4.23;
 
-import '../../auth_os.sol';
+import '../../../auth_os.sol';
 
 library BridgesConsole {
-  using LibEvents for uint;
-  using LibPayments for uint;
-  using LibStorage for uint;
-  using MemoryBuffers for uint;
-  using Pointers for *; 
+  using Contract for *;
 
   bytes32 internal constant BRIDGES = keccak256("bridges");
 

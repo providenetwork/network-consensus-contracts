@@ -1,11 +1,8 @@
+let AbstractStorage = artifacts.require('./AbstractStorage')
 let NetworkConsensus = artifacts.require('./mock/NetworkConsensusMock')
-let RegistryExec = artifacts.require('./mock/RegistryExec')
-let RegistryStorage = artifacts.require('./RegistryStorage')
 
-let InitRegistry = artifacts.require('./InitRegistry')
-let AppConsole = artifacts.require('./AppConsole')
-let VersionConsole = artifacts.require('./VersionConsole')
-let ImplementationConsole = artifacts.require('./ImplementationConsole')
+let RegistryIdx = artifacts.require('./RegistryIdx')
+let Provider = artifacts.require('./Provider')
 
 let Aura = artifacts.require('./Aura')
 let ValidatorConsole = artifacts.require('./ValidatorConsole')
@@ -13,127 +10,51 @@ let VotingConsole = artifacts.require('./VotingConsole')
 
 contract('NetworkConsensus', function(accounts) {
     let consensus
-    let registry
     let storage
     let masterOfCeremony
 
-    let initRegistry
-    let appConsole
-    let versionConsole
-    let implConsole
+    let registryIdx
+    let provider
 
-    let initAura
+    let aura
     let validatorConsole
     let votingConsole
 
     beforeEach(async () => {
-        initRegistry = await InitRegistry.new().should.be.fulfilled
-        appConsole = await AppConsole.new().should.be.fulfilled
-        versionConsole = await VersionConsole.new().should.be.fulfilled
-        implConsole = await ImplementationConsole.new().should.be.fulfilled
+        registryIdx = await RegistryIdx.new().should.be.fulfilled
+        provider = await Provider.new().should.be.fulfilled
 
-        initAura = await Aura.new().should.be.fulfilled
+        aura = await Aura.new().should.be.fulfilled
         validatorConsole = await ValidatorConsole.new().should.be.fulfilled
         votingConsole = await VotingConsole.new().should.be.fulfilled
 
-        storage = await RegistryStorage.new().should.be.fulfilled
+        storage = await AbstractStorage.new().should.be.fulfilled
         masterOfCeremony = accounts[0]
         consensus = await NetworkConsensus.new(
             masterOfCeremony,
             storage.address,
-            initRegistry.address,
-            appConsole.address,
-            versionConsole.address,
-            implConsole.address,
-            initAura.address,
+            registryIdx.address,
+            provider.address,
+            aura.address,
             validatorConsole.address,
             votingConsole.address
         ).should.be.fulfilled
-
-        let registryAddr = await consensus.getRegistryAddress()
-        registry = await RegistryExec.at(registryAddr)
     })
 
-    describe('initialization', async () => {
-        it('should have a reference to the given master of ceremony address', async () => {
-            masterOfCeremony.should.be.eq(accounts[0])
-        })
-
-        describe('auth-os application registry', async() => {
-            it('should have initialized the auth-os application registry', async() => {
-                registry.should.not.eq(null)
-            })
-
-            it('should have set a default application storage contract on the application registry', async() => {
-                let defaultStorage = await registry.default_storage()
-                defaultStorage.should.eq(storage.address)
-            })
-
-            it('should have set a default updater on the application registry', async() => {
-                let defaultUpdater = await registry.default_updater()
-                defaultUpdater.should.eq(consensus.address)
-            })
-
-            it('should have set a default provider on the application registry', async() => {
-                let defaultProvider = await registry.default_provider()
-                let expectedProvider = await consensus.getAppProviderHash(consensus.address).should.be.fulfilled
-                defaultProvider.should.eq(expectedProvider)
-            })
-
-            it('should have set a default registry exec id on the application registry', async() => {
-                let defaultExecId = await registry.default_registry_exec_id()
-                defaultExecId.should.not.deep.eq('0x0000000000000000000000000000000000000000000000000000000000000000')
-            })
-
-            it('should have set the initial exec admin on the application registry to the consensus contract', async() => {
-                let execAdmin = await registry.exec_admin()
-                execAdmin.should.eq(consensus.address)
-            })
-        })
-
-        it('should expose the validator console', async() => {
-            let validatorConsoleAddr = await consensus.getValidatorConsoleAddress.call()
-            validatorConsoleAddr.should.not.eq(null)
-        })
-
-        it('should expose the voting console', async() => {
-            let votingConsoleAddr = await consensus.getVotingConsoleAddress.call()
-            votingConsoleAddr.should.not.eq(null)
-        })
-    })
-
-    describe('#initRegistry', async () => {
-        beforeEach(async () => {
-        })
-
-        describe('#getAppLatestInfo', async () => {
-            it('should return the latest finalized version of the Aura consensus application', async () => {
-                let registryAddr = await consensus.getRegistryAddress()
-                let registry = await RegistryExec.at(registryAddr)
-                let registryExecId = await registry.default_registry_exec_id()
-
-                providerInfo = await initRegistry.getProviderInfoFromAddress(storage.address, registryExecId, consensus.address).should.be.fulfilled
-                providerInfo.should.not.eq(null)
-                providerInfo[1].length.should.be.eq(1)
-
-                let provider = await consensus.getAppProviderHash(consensus.address).should.be.fulfilled
-
-                appInfo = await initRegistry.getAppLatestInfo(storage.address, registryExecId, provider, 'Aura').should.be.fulfilled
-                appInfo.should.not.eq(null)
-                appInfo[appInfo.length - 1].length.should.be.eq(2)
-            })
-        })
-    })
-
-    describe('getValidator', async () => {
-        context('immediately after the consensus delegate has been configured', async () => {
+    describe('addValidator', async () => {
+        context('initial key ceremony', async () => {
             beforeEach(async () => {
+                await consensus.addValidator('0x87b7af6915fa56a837fa85e31ad6a450c41e8fab').should.be.fulfilled
             })
 
-            it('should return nil when attempting retrieve the master of ceremony validator struct', async () => {
-                let execId = await consensus.getConsensusAppExecId.call()
-                let validator = await initAura.getValidator.call(storage.address, execId, masterOfCeremony)
-                validator.should.be.eq(null)
+            it('should have added a pending validator', async () => {
+                let pendingValidatorCount = await consensus.getPendingValidatorCount.call()
+                pendingValidatorCount.toNumber().should.be.eq(2)
+
+                let pendingValidators = await consensus.getPendingValidators.call()
+                pendingValidators.length.should.be.eq(2)
+
+                pendingValidators.indexOf('0x87b7af6915fa56a837fa85e31ad6a450c41e8fab').should.be.eq(1)
             })
         })
     })
@@ -143,10 +64,10 @@ contract('NetworkConsensus', function(accounts) {
             beforeEach(async () => {
             })
 
-            it('should return nil when attempting retrieve the master of ceremony validator struct', async () => {
-                let execId = await consensus.getConsensusAppExecId.call()
-                let validatorMeta = await initAura.getValidatorMetadata.call(storage.address, execId, masterOfCeremony)
-                validatorMeta.should.be.eq(null)
+            it('should return empty validator metadata when attempting retrieve the master of ceremony validator struct', async () => {
+                let validatorMeta = await consensus.getValidatorMetadata.call(masterOfCeremony)
+                validatorMeta.should.not.be.eq(null)
+                validatorMeta.length.should.be.eq(9)
             })
         })
     })
@@ -157,8 +78,7 @@ contract('NetworkConsensus', function(accounts) {
             })
 
             it('should initialize the validator support divisor to the default validator support divisor of 2', async () => {
-                let execId = await consensus.getConsensusAppExecId.call()
-                let validatorSupportDivisor = await initAura.getValidatorSupportDivisor.call(storage.address, execId)
+                let validatorSupportDivisor = await consensus.getValidatorSupportDivisor.call()
                 validatorSupportDivisor.toNumber().should.be.eq(2)
             })
         })
@@ -170,8 +90,7 @@ contract('NetworkConsensus', function(accounts) {
             })
 
             it('should initialize the master of ceremony with support for itself', async () => {
-                let execId = await consensus.getConsensusAppExecId.call()
-                let validatorSupportCount = await initAura.getValidatorSupportCount.call(storage.address, execId, masterOfCeremony)
+                let validatorSupportCount = await consensus.getValidatorSupportCount.call(masterOfCeremony)
                 validatorSupportCount.toNumber().should.be.eq(1)
             })
         })
@@ -221,6 +140,30 @@ contract('NetworkConsensus', function(accounts) {
             it('should return 1', async () => {
                 let pendingValidatorCount = await consensus.getPendingValidatorCount.call()
                 pendingValidatorCount.toNumber().should.be.eq(1)
+            })
+        })
+    })
+
+    describe('getMinimumValidatorCount', async () => {
+        context('immediately after the consensus delegate has been configured', async () => {
+            beforeEach(async () => {
+            })
+
+            it('should return 12', async () => {
+                let minimumValidatorCount = await consensus.getMinimumValidatorCount.call()
+                minimumValidatorCount.toNumber().should.be.eq(12)
+            })
+        })
+    })
+
+    describe('getMaximumValidatorCount', async () => {
+        context('immediately after the consensus delegate has been configured', async () => {
+            beforeEach(async () => {
+            })
+
+            it('should return 1024', async () => {
+                let maximumValidatorCount = await consensus.getMaximumValidatorCount.call()
+                maximumValidatorCount.toNumber().should.be.eq(1024)
             })
         })
     })
