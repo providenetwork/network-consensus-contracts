@@ -51,7 +51,7 @@ library Aura {
 
   function init(
     address _master_of_ceremony
-  ) public view {
+  ) external view {
     require(_master_of_ceremony != address(0));
 
     Contract.initialize();

@@ -2,7 +2,7 @@ pragma solidity ^0.4.23;
 
 import '../../../../auth_os.sol';
 
-contract VotingConsole {
+library VotingConsole {
   using Contract for *;
   using SafeMath for uint;
   using ArrayUtils for bytes32[];
@@ -39,10 +39,10 @@ contract VotingConsole {
   function getProposals(
     address _storage, 
     bytes32 _exec_id
-  ) private view returns (address[] memory) {
+  ) external view returns (address[] memory) {
     require(_storage != address(0) && _exec_id != bytes32(0));
 
-    uint _proposals_count = getProposalsCount(_storage, _exec_id);
+    uint _proposals_count = uint(Contract.read(PROPOSALS_COUNT));
     bytes32[] memory arr_indices = new bytes32[](_proposals_count);
     for (uint i = 0; i < _proposals_count; i++) {
       arr_indices[i] = bytes32((32 * (i + 1)) + uint(PROPOSALS));
@@ -54,19 +54,19 @@ contract VotingConsole {
   function getProposalsCount(
     address _storage, 
     bytes32 _exec_id
-  ) private view returns (uint) {
+  ) external view returns (uint) {
     require(_storage != address(0) && _exec_id != bytes32(0));
-    return uint(GetterInterface(_storage).read(_exec_id, PROPOSALS_COUNT));
+    return uint(Contract.read(PROPOSALS_COUNT));
   }
 
   function getProposalCandidates(
     address _storage,
     bytes32 _exec_id,
     bytes32 _proposal_id
-  ) private view returns (bytes32[] memory) {
+  ) external view returns (bytes32[] memory) {
     require(_storage != address(0) && _exec_id != bytes32(0) && _proposal_id != bytes32(0));
 
-    uint _candidate_count = getProposalCandidateCount(_storage, _exec_id, _proposal_id);
+    uint _candidate_count = uint(Contract.read(keccak256(keccak256(_proposal_id, PROPOSAL), CANDIDATE_COUNT)));
     bytes32[] memory arr_indices = new bytes32[](_candidate_count);
     for (uint i = 0; i < _candidate_count; i++) {
       arr_indices[i] = bytes32((32 * (i + 1)) + uint(keccak256(keccak256(_proposal_id, PROPOSAL), CANDIDATES)));
@@ -79,49 +79,48 @@ contract VotingConsole {
     address _storage,
     bytes32 _exec_id,
     bytes32 _proposal_id
-  ) private view returns (uint) {
+  ) external view returns (uint) {
     require(_storage != address(0) && _exec_id != bytes32(0) && _proposal_id != bytes32(0));
-    return uint(GetterInterface(_storage).read(_exec_id, keccak256(keccak256(_proposal_id, PROPOSAL), CANDIDATE_COUNT)));
+    return uint(Contract.read(keccak256(keccak256(_proposal_id, PROPOSAL), CANDIDATE_COUNT)));
   }
 
   function getProposalExpired(
     address _storage,
     bytes32 _exec_id,
     bytes32 _proposal_id
-  ) private view returns (bool) {
+  ) external view returns (bool) {
     require(_storage != address(0) && _exec_id != bytes32(0) && _proposal_id != bytes32(0));
-    if (getProposalIsFinalized(_storage, _exec_id, _proposal_id)) {
-      return getProposalStatus(_storage, _exec_id, _proposal_id) == uint8(ProposalStatus.Expired);
+    if (bytes32(Contract.read(keccak256(keccak256(_proposal_id, PROPOSAL), FINALIZED))) == bytes32(1)) {
+      return uint8(Contract.read(keccak256(keccak256(_proposal_id, PROPOSAL), START_TIMESTAMP))) == uint8(ProposalStatus.Expired);
     }
-    uint _expiry_timestamp = getProposalExpiryTimestamp(_storage, _exec_id, _proposal_id);
-    return now >= _expiry_timestamp;
+    return now >= uint(Contract.read(keccak256(keccak256(_proposal_id, PROPOSAL), EXPIRY_TIMESTAMP)));
   }
 
   function getProposalIsFinalized(
     address _storage,
     bytes32 _exec_id,
     bytes32 _proposal_id
-  ) private view returns (bool) {
+  ) external view returns (bool) {
     require(_storage != address(0) && _exec_id != bytes32(0) && _proposal_id != bytes32(0));
-    return bytes32(GetterInterface(_storage).read(_exec_id, keccak256(keccak256(_proposal_id, PROPOSAL), FINALIZED))) == bytes32(1);
+    return bytes32(Contract.read(keccak256(keccak256(_proposal_id, PROPOSAL), FINALIZED))) == bytes32(1);
   }
 
   function getProposalStatus(
     address _storage,
     bytes32 _exec_id,
     bytes32 _proposal_id
-  ) private view returns (uint8) {
+  ) external view returns (uint8) {
     require(_storage != address(0) && _exec_id != bytes32(0) && _proposal_id != bytes32(0));
-    return uint8(GetterInterface(_storage).read(_exec_id, keccak256(keccak256(_proposal_id, PROPOSAL), START_TIMESTAMP)));
+    return uint8(Contract.read(keccak256(keccak256(_proposal_id, PROPOSAL), START_TIMESTAMP)));
   }
 
   function getProposalStartTimestamp(
     address _storage,
     bytes32 _exec_id,
     bytes32 _proposal_id
-  ) private view returns (uint) {
+  ) external view returns (uint) {
     require(_storage != address(0) && _exec_id != bytes32(0) && _proposal_id != bytes32(0));
-    return uint(GetterInterface(_storage).read(_exec_id, keccak256(keccak256(_proposal_id, PROPOSAL), START_TIMESTAMP)));
+    return uint(Contract.read(keccak256(keccak256(_proposal_id, PROPOSAL), START_TIMESTAMP)));
 
   }
 
@@ -129,9 +128,9 @@ contract VotingConsole {
     address _storage,
     bytes32 _exec_id,
     bytes32 _proposal_id
-  ) private view returns (uint) {
+  ) external view returns (uint) {
     require(_storage != address(0) && _exec_id != bytes32(0) && _proposal_id != bytes32(0));
-    return uint(GetterInterface(_storage).read(_exec_id, keccak256(keccak256(_proposal_id, PROPOSAL), EXPIRY_TIMESTAMP)));
+    return uint(Contract.read(keccak256(keccak256(_proposal_id, PROPOSAL), EXPIRY_TIMESTAMP)));
 
   }
 
@@ -139,9 +138,9 @@ contract VotingConsole {
     address _storage,
     bytes32 _exec_id,
     bytes32 _proposal_id
-  ) private view returns (uint) {
+  ) external view returns (uint) {
     require(_storage != address(0) && _exec_id != bytes32(0) && _proposal_id != bytes32(0));
-    return uint(GetterInterface(_storage).read(_exec_id, keccak256(keccak256(_proposal_id, PROPOSAL), VOTE_COUNT)));
+    return uint(Contract.read(keccak256(keccak256(_proposal_id, PROPOSAL), VOTE_COUNT)));
   }
 
   function getProposalCandidateVoteCount(
@@ -149,9 +148,9 @@ contract VotingConsole {
     bytes32 _exec_id,
     bytes32 _proposal_id,
     bytes32 _candidate
-  ) private view returns (uint) {
+  ) external view returns (uint) {
     require(_storage != address(0) && _exec_id != bytes32(0) && _proposal_id != bytes32(0));
-    return uint(GetterInterface(_storage).read(_exec_id, keccak256(keccak256(_proposal_id, PROPOSAL), keccak256(_candidate, VOTE_COUNT))));
+    return uint(Contract.read(keccak256(keccak256(_proposal_id, PROPOSAL), keccak256(_candidate, VOTE_COUNT))));
   }
 
   /*
@@ -172,10 +171,10 @@ contract VotingConsole {
     uint _nonce,
     uint _start_timestamp,
     uint _expiry_timestamp,
-    bytes memory _title,
-    bytes memory _data,
-    bytes32[] memory _candidates
-  ) private view {
+    bytes _title,
+    bytes _data,
+    bytes32[] _candidates
+  ) external view {
     // bytes32 _proposal_id = keccak256(_creator, keccak256(_title, _nonce));
     // uint ptr = buildProposal(_proposal_id, _creator, _start_timestamp, _expiry_timestamp, _title, _data, _candidates);
 
@@ -206,10 +205,10 @@ contract VotingConsole {
     uint _nonce,
     uint _start_timestamp,
     uint _expiry_timestamp,
-    bytes memory _title,
-    bytes memory _data,
-    bytes memory _proposed_calldata
-  ) private view {
+    bytes _title,
+    bytes _data,
+    bytes _proposed_calldata
+  ) external view {
     // bytes32 _proposal_id = keccak256(_creator, keccak256(_title, _nonce));
 
     // bytes32[] memory _candidates = new bytes32[](2);  // binary option
@@ -246,7 +245,7 @@ contract VotingConsole {
     bytes32 _proposal_id,
     address _voter,
     bytes32 _vote
-  ) private view {
+  ) external view {
     // require(_aura != address(0) && _storage != address(0) && _exec_id != bytes32(0));
     // require(_proposal_id != bytes32(0) && _voter != address(0));
 
@@ -312,7 +311,7 @@ contract VotingConsole {
     address _storage,
     bytes32 _exec_id,
     bytes32 _proposal_id
-  ) private view {
+  ) external view {
     require(_aura != address(0) && _storage != address(0) && _exec_id != bytes32(0));
     require(_proposal_id != bytes32(0));
 
@@ -372,9 +371,9 @@ contract VotingConsole {
     address _creator,
     uint _start_timestamp,
     uint _expiry_timestamp,
-    bytes memory _title,
-    bytes memory _data,
-    bytes32[] memory _candidates
+    bytes _title,
+    bytes _data,
+    bytes32[] _candidates
   ) private pure returns (uint) {
     require(_proposal_id != bytes32(0) && _creator != address(0) && _candidates.length > 1 && _start_timestamp < _expiry_timestamp);
 
@@ -424,7 +423,7 @@ contract VotingConsole {
     address _storage,
     bytes32 _exec_id,
     bytes32 _proposal_id
-  ) private view returns (uint8) {
+  ) external view returns (uint8) {
     // bytes memory _proposal_finalized_calldata = abi.encodeWithSelector(GET_PROPOSAL_FINALIZED_SEL, _storage, _exec_id, _proposal_id);
     // assembly {
     //   let success := staticcall(gas, _aura, add(0x20, _proposal_finalized_calldata), mload(_proposal_finalized_calldata), 0, 0)

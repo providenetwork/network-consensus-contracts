@@ -2,7 +2,7 @@ pragma solidity ^0.4.23;
 
 import '../../../../auth_os.sol';
 
-contract ValidatorConsole {
+library ValidatorConsole {
   using Contract for *;
   using SafeMath for uint;
   using ArrayUtils for bytes32[];
@@ -47,22 +47,22 @@ contract ValidatorConsole {
   bytes32 internal constant REPORT_VALIDATOR = keccak256("Report(address,uint,bool,bytes)");
 
   function getFinalized(
-  ) private view returns (bool) {
+  ) public view returns (bool) {
     return bytes32(Contract.read(FINALIZED)) == bytes32(1);
   }
 
   function getMaximumValidatorCount(
-  ) private view returns (uint) {
+  ) public view returns (uint) {
     
     return uint(Contract.read(MAX_VALIDATOR_COUNT));
   }
 
   function getMinimumValidatorCount(
-  ) private view returns (uint) {
+  ) public view returns (uint) {
     return uint(Contract.read(MIN_VALIDATOR_COUNT));
   }
 
-  function getValidators() private view returns (address[] memory) {
+  function getValidators() public view returns (address[] memory) {
     uint _validators_count = getValidatorCount();
     bytes32[] memory _validators = new bytes32[](_validators_count);
     for (uint i = 0; i < _validators_count; i++) {
@@ -72,7 +72,7 @@ contract ValidatorConsole {
     return _validators.toAddressArr();
   }
 
-  function getPendingValidators() private view returns (address[] memory) {
+  function getPendingValidators() public view returns (address[] memory) {
     uint _pending_validators_count = getPendingValidatorCount();
     bytes32[] memory _pending_validators = new bytes32[](_pending_validators_count);
     for (uint i = 0; i < _pending_validators_count; i++) {
@@ -84,7 +84,7 @@ contract ValidatorConsole {
 
   function getValidator(
     address _validator
-  ) private view returns (uint _validator_index,
+  ) public view returns (uint _validator_index,
                          address _validator_sealing_key,
                          address _validator_payout_key,
                          address _validator_voting_key,
@@ -98,29 +98,29 @@ contract ValidatorConsole {
     _is_validator = bytes32(Contract.read(keccak256(_validator, VALIDATOR_IS_VALIDATOR))) == bytes32(1);
   }
 
-  function getValidatorCount() private view returns (uint) {
+  function getValidatorCount() public view returns (uint) {
     return uint(Contract.read(VALIDATORS));
   }
 
-  function getPendingValidatorCount() private view returns (uint) {
+  function getPendingValidatorCount() public view returns (uint) {
     return uint(Contract.read(PENDING_VALIDATORS));
   }
 
   function isValidator(
     address _validator
-  ) private view returns (bool) {
+  ) public view returns (bool) {
     require(_validator != address(0));
     return bytes32(Contract.read(keccak256(_validator, VALIDATOR_IS_VALIDATOR))) == bytes32(1);
   }
 
   function getValidatorSupportCount(
     address _addr
-  ) private view returns (uint) {
+  ) public view returns (uint) {
     require(_addr != address(0));
     return uint(Contract.read(keccak256(_addr, VALIDATOR_SUPPORT_COUNT)));
   }
 
-  function getValidatorSupportDivisor() private view returns (uint) {
+  function getValidatorSupportDivisor() public view returns (uint) {
     return uint(Contract.read(VALIDATOR_SUPPORT_DIVISOR));
   }
   
@@ -130,7 +130,7 @@ contract ValidatorConsole {
   @param _index: The index at which the validator will exist in the validators list
   @return store_data: A formatted storage request
   */
-  function addValidator(address _validator) external view {
+  function addValidator(address _validator) public view {
     require(_validator != address(0) && !isValidator(_validator));
 
     Contract.authorize(msg.sender);
@@ -183,7 +183,7 @@ contract ValidatorConsole {
     bytes32 _validator_postal_code,
     bytes32 _validator_country,
     bytes32 _validator_phone
-  ) private view  {
+  ) public view  {
     require(_validator != address(0));
 
     Contract.authorize(msg.sender);
@@ -222,7 +222,7 @@ contract ValidatorConsole {
   @param _validator: The validator address to remove
   @return store_data: A formatted storage request
   */
-  function removeValidator(address _validator) private view {
+  function removeValidator(address _validator) public view {
     require(_validator != address(0));
 
     Contract.authorize(msg.sender);
@@ -263,7 +263,7 @@ contract ValidatorConsole {
   @param _index: The index at which the validator exists in the validators list
   @return store_data: A formatted storage request
   */
-  function setValidatorIndex(address _validator, uint _index) private view {
+  function setValidatorIndex(address _validator, uint _index) public view {
     require(_validator != address(0));
 
     Contract.authorize(msg.sender);
@@ -275,7 +275,7 @@ contract ValidatorConsole {
     Contract.commit();
   }
 
-  function setValidators(address[] _validators) private view {
+  function setValidators(address[] _validators) public view {
     Contract.authorize(msg.sender);
     Contract.storing();
 
@@ -287,7 +287,7 @@ contract ValidatorConsole {
     Contract.commit();
   }
 
-  function setPendingValidators(address[] _pending_validators) private view {
+  function setPendingValidators(address[] _pending_validators) public view {
     // Contract.storing();
 
     Contract.set(PENDING_VALIDATORS).to(_pending_validators.length);
@@ -303,14 +303,14 @@ contract ValidatorConsole {
   @param _finalized: The state of pending changes to the validator list
   @return store_data: A formatted storage request
   */
-  function setFinalized(bool _finalized) private view {
+  function setFinalized(bool _finalized) public view {
     Contract.authorize(msg.sender);
     Contract.storing();
     Contract.set(FINALIZED).to(_finalized);
     Contract.commit();
   }
 
-  function finalizeChange() private view {
+  function finalizeChange() public view {
     Contract.storing();
     Contract.set(FINALIZED).to(true);
     Contract.commit();
@@ -319,13 +319,13 @@ contract ValidatorConsole {
     // Contract.log([CHANGE_FINALIZED, _pending_valdators]);
   }
 
-  function reportBenign(address _validator, uint256 _block_number) private view {
+  function reportBenign(address _validator, uint256 _block_number) public view {
     Contract.authorize(msg.sender);
     // Contract.emitting();
     // Contract.log([REPORT_VALIDATOR, _validator, _block_number, false, new bytes(0)]);
   }
 
-  function reportMalicious(address _validator, uint256 _block_number, bytes _proof) private view {
+  function reportMalicious(address _validator, uint256 _block_number, bytes _proof) public view {
     Contract.authorize(msg.sender);
     // Contract.emitting();
     // Contract.log([REPORT_VALIDATOR, _validator, _block_number, true, _proof]);
