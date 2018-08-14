@@ -35,13 +35,13 @@ contract ProtocolProxy is Proxy {
 
 contract VotingConsoleProxy is IVotingConsole, ProtocolProxy {
 
-    function getProposals() external view returns (address[] memory _proposals) {
-        return IVotingConsole(app_index).getProposals(app_storage, app_exec_id);
-    }
+    // function getProposals() external view returns (address[] memory _proposals) {
+    //     return IVotingConsole(app_index).getProposals(app_storage, app_exec_id);
+    // }
 
-    function getProposalsCount() external view returns (uint) {
-        return IVotingConsole(app_index).getProposalsCount(app_storage, app_exec_id);
-    }
+    // function getProposalsCount() external view returns (uint) {
+    //     return IVotingConsole(app_index).getProposalsCount(app_storage, app_exec_id);
+    // }
 }
 
 contract ValidatorConsoleProxy is IValidatorConsole, VotingConsoleProxy {
@@ -72,65 +72,17 @@ contract ValidatorConsoleProxy is IValidatorConsole, VotingConsoleProxy {
 
     address public master_of_ceremony;
 
-    function getFinalized() public view returns (bool) {
-        return IValidatorConsole(app_index).getFinalized(app_storage, app_exec_id);
-    }
-
-    function getValidatorSupportCount(address _validator) public view returns (uint) {
-        return IValidatorConsole(app_index).getValidatorSupportCount(app_storage, app_exec_id, _validator);
-    }
-
-    function getValidatorSupportDivisor() public view returns (uint) {
-        return IValidatorConsole(app_index).getValidatorSupportDivisor(app_storage, app_exec_id);
-    }
-
-    function getMaximumValidatorCount() public view returns (uint) {
-        return IValidatorConsole(app_index).getMaximumValidatorCount(app_storage, app_exec_id);
-    }
-
-    function getMinimumValidatorCount() public view returns (uint) {
-        return IValidatorConsole(app_index).getMinimumValidatorCount(app_storage, app_exec_id);
-    }
-
-    function getValidators() public view returns (address[] memory _validators) {
-        return IValidatorConsole(app_index).getValidators(app_storage, app_exec_id);
-    }
-
-    function getValidatorCount() public view returns (uint) {
-        return IValidatorConsole(app_index).getValidatorCount(app_storage, app_exec_id);
-    }
-
-    function getValidatorIndex(address _validator) internal view returns (uint _validator_index) {
-        return IValidatorConsole(app_index).getValidatorIndex(app_storage, app_exec_id, _validator);
-    }
-
-    function getValidatorMetadata(address _validator) public view 
-    returns(bytes32[] memory _validator_name,
-            bytes32[] memory _validator_email,
-            bytes32[] memory _validator_address_line_1,
-            bytes32[] memory _validator_address_line_2,
-            bytes32[] memory _validator_city,
-            bytes32 _validator_state,
-            bytes32 _validator_postal_code,
-            bytes32 _validator_country,
-            bytes32 _validator_phone) {
-        return IValidatorConsole(app_index).getValidatorMetadata(app_storage, app_exec_id, _validator);
-    }
-
-    function getPendingValidators() public view returns (address[] memory _validators) {
-        return IValidatorConsole(app_index).getPendingValidators(app_storage, app_exec_id);
-
-    }
-
-    function getPendingValidatorCount() public view returns (uint) {
-        return IValidatorConsole(app_index).getPendingValidatorCount(app_storage, app_exec_id);
-    }
+    event ChangeFinalized(address[] validators);
+    event InitiateChange(bytes32 indexed parent_hash, address[] validators);
+    event InitializedRegistry(address indexed registry, bytes32 indexed registry_exec_id);
+    event Report(address indexed validator, uint indexed block_number, bool indexed malicious, bytes proof);
+    event Support(address indexed supporter, address indexed supported, bool indexed added);
 
     function finalizeChange() external onlySystem() onlyNotFinalized() {
-        bytes memory _set_validators_calldata = abi.encodeWithSelector(SET_VALIDATORS_SEL, getPendingValidators());
+        bytes memory _set_validators_calldata = abi.encodeWithSelector(SET_VALIDATORS_SEL, IAuraIdx(app_index).getPendingValidators(app_storage, app_exec_id));
         require(AuraProxy(this).exec(_set_validators_calldata));
         require(AuraProxy(this).exec(abi.encodeWithSelector(FINALIZE_CHANGE_SEL)));
-        emit ChangeFinalized(getValidators());
+        emit ChangeFinalized(IAuraIdx(app_index).getValidators(app_storage, app_exec_id));
     }
 
     // function addSupport(address _validator) public isValidator(msg.sender) isNotSupporting(_validator) withinMaximumValidatorLimit() {
@@ -166,7 +118,7 @@ contract ValidatorConsoleProxy is IValidatorConsole, VotingConsoleProxy {
 
     function initiateChange() private onlyFinalized() {
         require(AuraProxy(this).exec(abi.encodeWithSelector(SET_FINALIZED_SEL, false)));
-        emit InitiateChange(blockhash(block.number - 1), getPendingValidators());
+        emit InitiateChange(blockhash(block.number - 1), IAuraIdx(app_index).getPendingValidators(app_storage, app_exec_id));
     }
 
     function reportBenign(address _validator, uint256 _block_number) public {
@@ -179,8 +131,64 @@ contract ValidatorConsoleProxy is IValidatorConsole, VotingConsoleProxy {
         require(AuraProxy(this).exec(_calldata));
     }
 
-    function isInitialKeyCeremonyCompleted() internal view returns (bool) {
-        return IValidatorConsole(app_index).isInitialKeyCeremonyCompleted(app_storage, app_exec_id);
+        // AuraIdx
+
+    function getFinalized() public view returns (bool) {
+        return IAuraIdx(app_index).getFinalized(app_storage, app_exec_id);
+    }
+
+    function getValidatorSupportCount(address _validator) public view returns (uint) {
+        return IAuraIdx(app_index).getValidatorSupportCount(app_storage, app_exec_id, _validator);
+    }
+
+    function getValidatorSupportDivisor() public view returns (uint) {
+        return IAuraIdx(app_index).getValidatorSupportDivisor(app_storage, app_exec_id);
+    }
+
+    function getMaximumValidatorCount() public view returns (uint) {
+        return IAuraIdx(app_index).getMaximumValidatorCount(app_storage, app_exec_id);
+    }
+
+    function getMinimumValidatorCount() public view returns (uint) {
+        return IAuraIdx(app_index).getMinimumValidatorCount(app_storage, app_exec_id);
+    }
+
+    function getValidators() public view returns (address[] memory _validators) {
+        return IAuraIdx(app_index).getValidators(app_storage, app_exec_id);
+    }
+
+    function getValidatorCount() public view returns (uint) {
+        return IAuraIdx(app_index).getValidatorCount(app_storage, app_exec_id);
+    }
+
+    function getValidatorIndex(address _validator) public view returns (uint _validator_index) {
+        return IAuraIdx(app_index).getValidatorIndex(app_storage, app_exec_id, _validator);
+    }
+
+    function getValidatorMetadata(address _validator) public view 
+    returns(bytes32[] memory _validator_name,
+            bytes32[] memory _validator_email,
+            bytes32[] memory _validator_address_line_1,
+            bytes32[] memory _validator_address_line_2,
+            bytes32[] memory _validator_city,
+            bytes32 _validator_state,
+            bytes32 _validator_postal_code,
+            bytes32 _validator_country,
+            bytes32 _validator_phone) {
+        return IAuraIdx(app_index).getValidatorMetadata(app_storage, app_exec_id, _validator);
+    }
+
+    function getPendingValidators() public view returns (address[] memory _validators) {
+        return IAuraIdx(app_index).getPendingValidators(app_storage, app_exec_id);
+
+    }
+
+    function getPendingValidatorCount() public view returns (uint) {
+        return IAuraIdx(app_index).getPendingValidatorCount(app_storage, app_exec_id);
+    }
+
+    function isInitialKeyCeremonyCompleted() public view returns (bool) {
+        return IAuraIdx(app_index).isInitialKeyCeremonyCompleted(app_storage, app_exec_id);
     }
 
     modifier isSupportedByMajority(address _validator) {
@@ -203,12 +211,12 @@ contract ValidatorConsoleProxy is IValidatorConsole, VotingConsoleProxy {
     }
 
     modifier _isValidator(address _validator) {
-        require(IValidatorConsole(app_index).isValidator(app_storage, app_exec_id, _validator));
+        require(IAuraIdx(app_index).isValidator(app_storage, app_exec_id, _validator));
         _;
     }
 
     modifier isNotValidator(address _validator) {
-        require(!IValidatorConsole(app_index).isValidator(app_storage, app_exec_id, _validator));
+        require(!IAuraIdx(app_index).isValidator(app_storage, app_exec_id, _validator));
         _;
     }
 
@@ -244,6 +252,12 @@ contract ValidatorConsoleProxy is IValidatorConsole, VotingConsoleProxy {
 }
 
 contract AuraProxy is IAura, ValidatorConsoleProxy {
+
+    event ChangeFinalized(address[] validators);
+    event InitiateChange(bytes32 indexed parent_hash, address[] validators);
+    event InitializedRegistry(address indexed registry, bytes32 indexed registry_exec_id);
+    event Report(address indexed validator, uint indexed block_number, bool indexed malicious, bytes proof);
+    event Support(address indexed supporter, address indexed supported, bool indexed added);
 
     constructor(
         address _master_of_ceremony,

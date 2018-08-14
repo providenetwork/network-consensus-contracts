@@ -72,7 +72,7 @@ library ValidatorConsole {
     return _validators.toAddressArr();
   }
 
-  function getPendingValidators() public view returns (address[] memory) {
+  function getPendingValidators() public view returns (address[]) {
     uint _pending_validators_count = getPendingValidatorCount();
     bytes32[] memory _pending_validators = new bytes32[](_pending_validators_count);
     for (uint i = 0; i < _pending_validators_count; i++) {
@@ -130,7 +130,7 @@ library ValidatorConsole {
   @param _index: The index at which the validator will exist in the validators list
   @return store_data: A formatted storage request
   */
-  function addValidator(address _validator) public view {
+  function addValidator(address _validator) external view {
     require(_validator != address(0) && !isValidator(_validator));
 
     Contract.authorize(msg.sender);
